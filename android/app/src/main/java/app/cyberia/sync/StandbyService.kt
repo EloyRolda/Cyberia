@@ -49,6 +49,7 @@ class StandbyService : Service() {
     private val charging = MutableStateFlow(false)
     private val onWifi = MutableStateFlow(false)
     private val link = MutableStateFlow<Link>(Link.Idle)
+    private var current: android.app.Notification? = null
 
     private sealed interface Link {
         data object Idle : Link
@@ -122,13 +123,19 @@ class StandbyService : Service() {
             combine(link, graph.syncManager.status, charging, onWifi) { link, status, isCharging, wifi ->
                 notificationText(link, status, isCharging, wifi)
             }.distinctUntilChanged().collect { (title, text, progress) ->
-                val nm = getSystemService(android.app.NotificationManager::class.java)
-                nm?.notify(Notifications.ID_STANDBY, Notifications.standby(this@StandbyService, title, text, progress))
+                val notification = Notifications.standby(this@StandbyService, title, text, progress)
+                current = notification
+                getSystemService(android.app.NotificationManager::class.java)
+                    ?.notify(Notifications.ID_STANDBY, notification)
             }
         }
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int = START_STICKY
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Cada startForegroundService() espera un startForeground(); se repite con el aviso vigente.
+        if (!enterForeground()) stopSelf()
+        return START_STICKY
+    }
 
     override fun onDestroy() {
         scope.cancel()
@@ -138,7 +145,7 @@ class StandbyService : Service() {
     }
 
     private fun enterForeground(): Boolean = try {
-        val notification = Notifications.standby(this, "Cyberia en espera", "Preparando…")
+        val notification = current ?: Notifications.standby(this, "Cyberia en espera", "Preparando…")
         val type = if (Build.VERSION.SDK_INT >= 29) ServiceInfo.FOREGROUND_SERVICE_TYPE_CONNECTED_DEVICE else 0
         ServiceCompat.startForeground(this, Notifications.ID_STANDBY, notification, type)
         true

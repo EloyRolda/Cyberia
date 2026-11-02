@@ -48,7 +48,7 @@ class PcLocator(private val context: Context, private val prefs: AppPrefs) {
         }
         discover(pc.pcId, timeoutMs = 6_000)?.let { if (tryEndpoint(it)) return it }
         prefs.manualHost.value?.let { manual ->
-            val endpoint = parseManual(manual, pc.port)
+            val endpoint = Endpoint.parse(manual, pc.port)
             if (endpoint != null && tryEndpoint(endpoint)) return endpoint
         }
         return null
@@ -109,15 +109,5 @@ class PcLocator(private val context: Context, private val prefs: AppPrefs) {
 
     companion object {
         const val SERVICE_TYPE = "_cyberia._tcp"
-
-        /** Acepta `192.168.0.10` o `192.168.0.10:47474`. */
-        fun parseManual(text: String, defaultPort: Int): Endpoint? {
-            val clean = text.trim()
-            if (clean.isEmpty()) return null
-            val host = clean.substringBefore(':')
-            val port = clean.substringAfter(':', "").toIntOrNull() ?: defaultPort
-            if (host.isEmpty() || port !in 1..65535) return null
-            return Endpoint(host, port)
-        }
     }
 }

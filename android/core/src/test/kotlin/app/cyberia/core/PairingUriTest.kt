@@ -27,6 +27,17 @@ class PairingUriTest {
     }
 
     @Test
+    fun ipEscritaAMano() {
+        assertEquals(Endpoint("192.168.0.10", 47474), Endpoint.parse(" 192.168.0.10 ", 47474))
+        assertEquals(Endpoint("192.168.0.10", 5000), Endpoint.parse("192.168.0.10:5000", 47474))
+        assertEquals(Endpoint("mi-pc.local", 47474), Endpoint.parse("https://mi-pc.local/", 47474))
+        assertEquals(null, Endpoint.parse("192.168.0.10:abc", 47474))
+        assertEquals(null, Endpoint.parse("192.168.0.10:70000", 47474))
+        assertEquals(null, Endpoint.parse("", 47474))
+        assertEquals(null, Endpoint.parse("hola mundo", 47474))
+    }
+
+    @Test
     fun endpointIpv6() {
         assertEquals("https://[fe80::1]:47474", Endpoint("fe80::1", 47474).baseUrl)
     }

@@ -100,4 +100,18 @@ data class Endpoint(val host: String, val port: Int) {
         get() = if (host.contains(':')) "https://[$host]:$port" else "https://$host:$port"
 
     override fun toString(): String = if (host.contains(':')) "[$host]:$port" else "$host:$port"
+
+    companion object {
+        /** IP escrita a mano: `192.168.0.10` o `192.168.0.10:47474`. `null` si no sirve. */
+        fun parse(text: String, defaultPort: Int): Endpoint? {
+            val clean = text.trim().removePrefix("https://").removePrefix("http://").trimEnd('/')
+            if (clean.isEmpty() || clean.count { it == ':' } > 1) return null
+            val host = clean.substringBefore(':')
+            val portText = clean.substringAfter(':', "")
+            val port = if (portText.isEmpty()) defaultPort else portText.toIntOrNull() ?: return null
+            val validHost = host.isNotEmpty() && host.all { it.isLetterOrDigit() || it == '.' || it == '-' }
+            if (!validHost || port !in 1..65535) return null
+            return Endpoint(host, port)
+        }
+    }
 }
