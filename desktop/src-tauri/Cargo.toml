@@ -1,0 +1,27 @@
+[package]
+name = "cyberia-desktop"
+description = "Cyberia para la PC: publica una carpeta de audios para el celular."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+name = "cyberia_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+cyberia-core = { path = "../../crates/cyberia-core" }
+tauri = { version = "2", features = ["tray-icon"] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-single-instance = "2"
+tauri-plugin-notification = "2"
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+anyhow.workspace = true
