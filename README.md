@@ -1,0 +1,105 @@
+# Cyberia
+
+Tus audios de la PC, en el celular y sin conexión. Dos apps que se hablan por el Wi-Fi de casa,
+sin servidores en internet, cuentas ni nube:
+
+- **PC** (`desktop/`, Tauri 2 + Rust): vive en la bandeja, publica una carpeta de audios y avisa
+  al celular cuando apretás **Sincronizar**.
+- **Celular** (`android/`, Kotlin + Compose): baja los audios mientras carga en el Wi-Fi de casa
+  y los reproduce sin conexión, con controles de auriculares y de pantalla bloqueada.
+
+Los requisitos completos están en [`DataToStart/Cyberia — Requisitos funcionales.md`](DataToStart/).
+
+## Cómo se usa
+
+1. Instalá Cyberia en la PC y elegí (o creá) la carpeta de audios. Cada subcarpeta es una playlist.
+2. Instalá el APK en el celular, tocá **Escanear QR** y apuntá al código que muestra la PC
+   (**Vincular celular**). El código vence a los 5 minutos y sirve una sola vez.
+3. Copiá audios a la carpeta y tocá **Sincronizar**. Si el celular está cargando en el Wi-Fi de
+   casa, los baja al instante; si no, en la próxima revisión (cada 15 minutos con Wi-Fi, al
+   empezar a cargar o al abrir la app).
+4. La PC confirma cuántos audios llegaron y, si algo falló, cuál y por qué.
+
+## Estructura
+
+| Carpeta | Qué hay |
+| --- | --- |
+| `crates/cyberia-core` | Núcleo de la PC: índice de la carpeta con huellas BLAKE3 en caché, manifiesto versionado, certificado propio, QR de un solo uso, API HTTPS (axum + rustls) con rangos y avisos SSE, anuncio mDNS. |
+| `crates/cyberia-server` | El mismo núcleo sin interfaz, para la fase 0, depurar la app Android y las pruebas. |
+| `desktop/` | App de bandeja (Tauri 2) con interfaz en HTML/TypeScript sin framework. |
+| `android/core` | Núcleo del celular en Kotlin puro (JVM): cliente con certificado fijado, motor de sincronización, BLAKE3. Se prueba sin el SDK de Android. |
+| `android/app` | App Android: Compose, Room, Media3, WorkManager, servicio de espera, escáner ZXing. |
+| `docs/protocolo.md` | La API entre la PC y el celular. |
+
+## Desarrollo
+
+Requisitos: Rust estable, Node 22, JDK 17 y, para la app Android, el SDK de Android (API 35).
+En Linux, además, las dependencias de Tauri:
+
+```bash
+sudo apt-get install -y libwebkit2gtk-4.1-dev librsvg2-dev libayatana-appindicator3-dev libxdo-dev
+```
+
+### PC
+
+```bash
+cd desktop && npm ci && npm run tauri dev
+```
+
+Instalador de Windows (NSIS):
+
+```bash
+cd desktop && npx tauri build --bundles nsis
+```
+
+Servidor sin interfaz (muestra el QR en la terminal; comandos por la entrada estándar: `sync`,
+`pair`, `unpair`, `status`, `quit`):
+
+```bash
+cargo run -p cyberia-server -- --folder ~/Música/Cyberia --pair
+```
+
+### Celular
+
+```bash
+cd android && ./gradlew :app:assembleDebug
+```
+
+El APK queda en `android/app/build/outputs/apk/debug/`.
+
+### Pruebas
+
+```bash
+cargo test --workspace
+```
+
+```bash
+cargo build -p cyberia-server && cd android && ./gradlew -p core test
+```
+
+La segunda corre el núcleo Kotlin contra el servidor Rust real: emparejamiento, certificado
+fijado, descargas que se retoman, mover sin volver a descargar, borrados con confirmación,
+avisos SSE y desvinculación. No necesita el SDK de Android.
+
+La CI (`.github/workflows/ci.yml`) corre todo eso, compila el APK y el instalador de Windows y
+los deja como artefactos de cada ejecución.
+
+## Estado del MVP
+
+| Funcionalidad | Estado |
+| --- | --- |
+| Vincular PC y celular con un QR (RF-01 a RF-07) | Hecho |
+| App de PC: carpeta, lista por subcarpeta, botón Sincronizar, estado del celular, resultado, bandeja (RF-08 a RF-14) | Hecho |
+| Sincronización de una vía, borrados al final, confirmación de borrados grandes, descargas que se retoman, sin espacio (RF-17 a RF-26) | Hecho |
+| Reproductor offline con controles de auriculares y pantalla bloqueada (RF-29 a RF-37) | Hecho |
+| Modo espera mientras carga, revisión periódica, nunca datos móviles (RF-40 a RF-42) | Hecho |
+| Mover o renombrar sin volver a descargar (RF-27, v1) | Hecho de paso: los audios se identifican por huella |
+| Reactivar el modo espera al reiniciar el celular (RF-44, v1) | Hecho de paso |
+
+**Falta probar en celulares reales** (criterios de salida de las fases 0 a 3): que la espera
+sobreviva una hora en al menos dos marcas, 100 audios sin errores, una playlist entera con el
+celular en el bolsillo y la instalación por alguien que no conoce la app.
+
+**Pendiente para v1:** sincronización automática al detectar cambios (RF-28), posición por audio
+(RF-38), título y duración desde las etiquetas (RF-39), arrastrar audios a la ventana (RF-15),
+arrancar con el sistema (RF-16), apagar el modo espera (RF-43), firma de release y Google Play.
