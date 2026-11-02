@@ -18,12 +18,12 @@ data class TrackEntity(
     val id: String,
     val playlist: String,
     val size: Long,
-) {
-    val fileName: String get() = path.substringAfterLast('/')
+)
 
-    /** Nombre del archivo sin extensión. Las etiquetas del archivo quedan para v1 (RF-39). */
-    val title: String get() = fileName.substringBeforeLast('.', fileName)
-}
+val TrackEntity.fileName: String get() = path.substringAfterLast('/')
+
+/** Nombre del archivo sin extensión. Las etiquetas del archivo quedan para v1 (RF-39). */
+val TrackEntity.title: String get() = fileName.substringBeforeLast('.', fileName)
 
 @Dao
 interface TrackDao {

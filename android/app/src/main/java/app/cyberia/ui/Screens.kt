@@ -78,6 +78,7 @@ import app.cyberia.core.PairedPc
 import app.cyberia.core.PendingDeletion
 import app.cyberia.data.LastSync
 import app.cyberia.data.TrackEntity
+import app.cyberia.data.title
 import app.cyberia.player.PlayerUi
 import app.cyberia.sync.SyncStatus
 import kotlinx.coroutines.delay

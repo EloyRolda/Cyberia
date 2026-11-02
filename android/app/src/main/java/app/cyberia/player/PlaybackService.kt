@@ -16,6 +16,7 @@ import androidx.media3.session.MediaSessionService
 import app.cyberia.R
 import app.cyberia.data.AppPrefs
 import app.cyberia.data.TrackEntity
+import app.cyberia.data.title
 import app.cyberia.graph
 import app.cyberia.sync.Notifications
 import com.google.common.util.concurrent.ListenableFuture
