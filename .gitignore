@@ -1,0 +1,23 @@
+# Rust
+/target/
+
+# Node / frontend de la PC
+node_modules/
+/desktop/dist/
+
+# Gradle / Android
+.gradle/
+build/
+local.properties
+*.iml
+.idea/
+.kotlin/
+captures/
+*.apk
+*.aab
+*.keystore
+!debug.keystore
+
+# Datos de pruebas locales
+cyberia-data/
+.DS_Store
