@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Cyberia</string>
+    <string name="channel_standby">Modo espera</string>
+    <string name="channel_standby_desc">Aviso fijo mientras Cyberia espera audios nuevos de la PC.</string>
+    <string name="channel_sync">Descargas</string>
+    <string name="channel_sync_desc">Progreso de las descargas desde la PC.</string>
+    <string name="channel_library">Biblioteca</string>
+    <string name="channel_library_desc">Audios nuevos, falta de espacio y borrados para confirmar.</string>
+</resources>

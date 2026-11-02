@@ -1,6 +1,5 @@
 package app.cyberia.core
 
-import org.apache.commons.codec.digest.Blake3
 import java.io.File
 import java.security.MessageDigest
 
@@ -18,7 +17,7 @@ internal fun ByteArray.toHex(): String {
 object Hashing {
     /** Huella de un archivo en el mismo formato que la PC: `b3:` + BLAKE3 en hexadecimal. */
     fun fileId(file: File): String {
-        val hasher = Blake3.initHash()
+        val hasher = Blake3()
         val buffer = ByteArray(256 * 1024)
         file.inputStream().use { input ->
             while (true) {
@@ -27,7 +26,7 @@ object Hashing {
                 hasher.update(buffer, 0, n)
             }
         }
-        return "b3:" + hasher.doFinalize(32).toHex()
+        return "b3:" + hasher.digest().toHex()
     }
 
     fun bytesId(bytes: ByteArray): String = "b3:" + Blake3.hash(bytes).toHex()

@@ -5,6 +5,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.serialization.Serializable
 
 /** Avance de una sincronización, para la notificación y la interfaz. */
 data class SyncProgress(
@@ -16,6 +17,7 @@ data class SyncProgress(
 )
 
 /** Borrado grande que espera confirmación del usuario (RF-20). */
+@Serializable
 data class PendingDeletion(
     val manifestVersion: Long,
     val paths: List<String>,

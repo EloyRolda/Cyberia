@@ -22,9 +22,9 @@ dependencies {
     api(libs.kotlinx.serialization.json)
     api(libs.okhttp)
     implementation(libs.okhttp.sse)
-    implementation(libs.commons.codec)
 
     testImplementation(kotlin("test"))
+    testImplementation(libs.commons.codec)
     testImplementation(libs.junit.jupiter)
     testRuntimeOnly(libs.junit.platform.launcher)
 }
