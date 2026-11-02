@@ -115,6 +115,7 @@ button.link { border: none; background: none; padding: 0; color: var(--danger); 
 .banner.danger { background: var(--danger-soft); color: var(--danger); }
 .banner.warn { background: var(--warn-soft); color: var(--warn); }
 .banner.ok { background: var(--ok-soft); color: var(--ok); }
+.banner.info { background: var(--brand-soft); color: var(--text); }
 
 .sync { display: grid; gap: 10px; }
 #report:empty { display: none; }

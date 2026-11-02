@@ -326,7 +326,7 @@ function renderSync(s: UiState): void {
     parts.push(
       el(
         "div",
-        { class: "banner" },
+        { class: "banner info" },
         s.phoneConnected
           ? `Avisé a ${device}. Esperando que descargue…`
           : `${device} no está conectado. Los cambios quedan pendientes y se descargan la próxima vez que se conecte (al cargar, o en menos de 15 minutos con Wi-Fi).`,
@@ -336,7 +336,8 @@ function renderSync(s: UiState): void {
     parts.push(el("div", { class: "banner warn" }, "Publicado. Vinculá un celular para que lo descargue."));
   }
 
-  if (r && s.device) {
+  // Mientras se espera el informe nuevo, el anterior confunde: no se muestra.
+  if (r && s.device && !waiting) {
     const when = relativeTime(r.receivedAtMs);
     if (r.downloaded.length > 0) {
       parts.push(
