@@ -30,7 +30,13 @@ sealed interface SyncStatus {
 }
 
 /** Por qué se sincroniza. Sirve para decidir cuánto insistir y qué avisar. */
-enum class Trigger { App, Pull, Push, Periodic, Charging }
+enum class Trigger(val byUser: Boolean) {
+    App(true),
+    Pull(true),
+    Push(false),
+    Periodic(false),
+    Charging(false),
+}
 
 /**
  * Coordina la vinculación y las sincronizaciones del celular: encuentra la PC, corre el motor y
@@ -111,17 +117,40 @@ class SyncManager(
         Notifications.unpaired(context)
     }
 
+    /** Pedido de sincronizar que llegó mientras otra estaba en curso. */
+    @Volatile
+    private var rerunRequested = false
+
     /**
-     * Revisa si hay audios nuevos y los descarga. Si ya hay una sincronización en curso, no hace
-     * nada. Devuelve el resultado o `null` si no se pudo sincronizar.
+     * Revisa si hay audios nuevos y los descarga. Si ya hay una sincronización en curso, anota el
+     * pedido y la repite al terminar (por ejemplo, si se aprieta Sincronizar en la PC a mitad de
+     * una descarga). Devuelve el resultado o `null` si no se pudo sincronizar.
      */
     suspend fun syncNow(trigger: Trigger, allowLargeDeletion: Boolean = false): SyncResult? {
-        if (!running.tryLock()) return null
+        if (!running.tryLock()) {
+            rerunRequested = true
+            return null
+        }
+        try {
+            var result: SyncResult?
+            var attempts = 0
+            do {
+                rerunRequested = false
+                result = syncOnce(trigger, allowLargeDeletion)
+                attempts++
+            } while (rerunRequested && result != null && attempts < 5)
+            return result
+        } finally {
+            running.unlock()
+        }
+    }
+
+    private suspend fun syncOnce(trigger: Trigger, allowLargeDeletion: Boolean): SyncResult? {
         try {
             val pc = prefs.pairedPc.value ?: return null
             val network = WifiNetworks.current(context)
             if (network == null) {
-                if (trigger == Trigger.Pull || trigger == Trigger.App) {
+                if (trigger.byUser) {
                     _status.value = SyncStatus.Failed("Sin Wi-Fi. Cyberia solo sincroniza en el Wi-Fi de casa; los audios descargados se escuchan igual.")
                 }
                 return null
@@ -129,9 +158,12 @@ class SyncManager(
             _status.value = SyncStatus.Searching
             val endpoint = locator.locate(pc, network)
             if (endpoint == null) {
-                _status.value = SyncStatus.Failed(
-                    "No encuentro a ${pc.pcName}. ¿Está prendida, con Cyberia abierta y en el mismo Wi-Fi?",
-                )
+                // En segundo plano no es un error: puede ser otro Wi-Fi o la PC apagada.
+                _status.value = if (trigger.byUser) {
+                    SyncStatus.Failed("No encuentro a ${pc.pcName}. ¿Está prendida, con Cyberia abierta y en el mismo Wi-Fi?")
+                } else {
+                    SyncStatus.Idle
+                }
                 return null
             }
             prefs.rememberHost(endpoint.host, endpoint.port)
@@ -143,10 +175,12 @@ class SyncManager(
             onUnpairedByPc()
             return null
         } catch (e: CyberiaException) {
-            _status.value = SyncStatus.Failed(e.message ?: "No se pudo sincronizar")
+            _status.value = if (trigger.byUser || e is CyberiaException.CertificateMismatch) {
+                SyncStatus.Failed(e.message ?: "No se pudo sincronizar")
+            } else {
+                SyncStatus.Idle
+            }
             return null
-        } finally {
-            running.unlock()
         }
     }
 
