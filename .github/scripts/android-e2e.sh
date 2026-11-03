@@ -12,14 +12,14 @@ WORK="$(mktemp -d)"
 OUT="${E2E_OUT:-e2e-out}"
 mkdir -p "$OUT" "$WORK/music/Para correr" "$WORK/music/Podcasts"
 
-# Audios WAV reales (un tono de 2 segundos) para que el reproductor los acepte.
+# Audios WAV reales (un tono de 30 segundos) para que el reproductor los acepte.
 wav() {
   python3 - "$1" "$2" <<'PY'
 import math, struct, sys, wave
 path, freq = sys.argv[1], float(sys.argv[2])
 with wave.open(path, "wb") as w:
-    w.setnchannels(1); w.setsampwidth(2); w.setframerate(22050)
-    w.writeframes(b"".join(struct.pack("<h", int(8000 * math.sin(2 * math.pi * freq * i / 22050))) for i in range(22050 * 2)))
+    w.setnchannels(1); w.setsampwidth(2); w.setframerate(11025)
+    w.writeframes(b"".join(struct.pack("<h", int(8000 * math.sin(2 * math.pi * freq * i / 11025))) for i in range(11025 * 30)))
 PY
 }
 wav "$WORK/music/Para correr/01 Arranque.wav" 440
@@ -36,8 +36,8 @@ trap 'echo quit >&3 || true; kill $SERVER_PID 2>/dev/null || true; adb logcat -d
 
 shot() { # shot <nombre>: captura de pantalla en $OUT (y en el log si E2E_PRINT_SCREENSHOTS=1)
   adb exec-out screencap -p > "$OUT/$1.png"
-  if [ -n "${E2E_PRINT_SCREENSHOTS:-}" ] && command -v convert >/dev/null; then
-    echo "SCREENSHOT $1 $(convert "$OUT/$1.png" -resize 432x -quality 70 jpg:- | base64 -w0)"
+  if [ -n "${E2E_PRINT_SCREENSHOTS:-}" ]; then
+    echo "SCREENSHOT $1 $(base64 -w0 "$OUT/$1.png")"
   fi
 }
 
@@ -130,7 +130,7 @@ echo "== Reproducción"
 # Reproduce la playlist «Para correr» desde la app, con la PC apagada (RF-30).
 kill $SERVER_PID 2>/dev/null || true
 tap_desc "Reproducir Para correr"
-playing() { adb shell dumpsys media_session | grep -q "state=PlaybackState {state=3"; }
+playing() { adb shell dumpsys media_session | grep -q "state=PlaybackState {state=PLAYING(3)\|state=PlaybackState {state=3"; }
 if ! wait_for 30 playing; then
   echo "El reproductor no empezó a sonar"; adb shell dumpsys media_session | head -60; exit 1
 fi
