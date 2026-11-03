@@ -35,26 +35,42 @@ exec 3> "$WORK/server.in"
 trap 'echo quit >&3 || true; kill $SERVER_PID 2>/dev/null || true; adb logcat -d > "$OUT/logcat.txt" 2>/dev/null || true' EXIT
 
 shot() { # shot <nombre>: captura de pantalla en $OUT (y en el log si E2E_PRINT_SCREENSHOTS=1)
+  dismiss_system_dialogs || true
   adb exec-out screencap -p > "$OUT/$1.png"
   if [ -n "${E2E_PRINT_SCREENSHOTS:-}" ]; then
     echo "SCREENSHOT $1 $(base64 -w0 "$OUT/$1.png")"
   fi
 }
 
-tap_desc() { # tap_desc <descripción>: toca el elemento con esa descripción de accesibilidad
+find_node() { # find_node <atributo> <valor>: centro del elemento en pantalla, o nada
   adb shell uiautomator dump /sdcard/ui.xml >/dev/null
   adb pull /sdcard/ui.xml "$WORK/ui.xml" >/dev/null
-  local xy
-  xy="$(python3 - "$WORK/ui.xml" "$1" <<'PY'
+  python3 - "$WORK/ui.xml" "$1" "$2" <<'PY'
 import re, sys, xml.etree.ElementTree as ET
 root = ET.parse(sys.argv[1]).getroot()
 for node in root.iter("node"):
-    if node.get("content-desc") == sys.argv[2]:
+    if node.get(sys.argv[2]) == sys.argv[3]:
         x1, y1, x2, y2 = map(int, re.findall(r"\d+", node.get("bounds")))
         print((x1 + x2) // 2, (y1 + y2) // 2)
         break
 PY
-)"
+}
+
+# En los runners lentos el lanzador del emulador a veces se cuelga y su diálogo tapa la app.
+dismiss_system_dialogs() {
+  local xy
+  for _ in 1 2 3; do
+    xy="$(find_node text Wait)"
+    [ -n "$xy" ] || return 0
+    adb shell input tap $xy
+    sleep 1
+  done
+}
+
+tap_desc() { # tap_desc <descripción>: toca el elemento con esa descripción de accesibilidad
+  dismiss_system_dialogs
+  local xy
+  xy="$(find_node content-desc "$1")"
   [ -n "$xy" ] || { echo "No encontré «$1» en la pantalla"; return 1; }
   adb shell input tap $xy
 }
@@ -94,6 +110,7 @@ echo "QR: $URI"
 adb install -r "$APK"
 adb shell pm grant app.cyberia android.permission.POST_NOTIFICATIONS || true
 adb shell dumpsys battery set ac 1 || true
+adb shell settings put global hide_error_dialogs 1 || true
 adb logcat -c
 
 echo "== Vinculación por enlace y primera sincronización"
