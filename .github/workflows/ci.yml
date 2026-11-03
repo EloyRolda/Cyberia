@@ -136,8 +136,6 @@ jobs:
 
       - name: Prueba en el emulador
         uses: reactivecircus/android-emulator-runner@v2
-        env:
-          E2E_PRINT_SCREENSHOTS: "1"
         with:
           api-level: 34
           target: google_apis
