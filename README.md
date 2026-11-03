@@ -14,7 +14,9 @@ Los requisitos completos están en [`DataToStart/Cyberia — Requisitos funciona
 
 1. Instalá Cyberia en la PC y elegí (o creá) la carpeta de audios. Cada subcarpeta es una playlist.
 2. Instalá el APK en el celular, tocá **Escanear QR** y apuntá al código que muestra la PC
-   (**Vincular celular**). El código vence a los 5 minutos y sirve una sola vez.
+   (**Vincular celular**). También se puede escanear con la cámara del sistema: abre Cyberia y
+   pide confirmar. El código vence a los 5 minutos y sirve una sola vez. La primera vez, Windows
+   pregunta si deja que Cyberia use la red: hay que permitirlo en redes privadas.
 3. Copiá audios a la carpeta y tocá **Sincronizar**. Si el celular está cargando en el Wi-Fi de
    casa, los baja al instante; si no, en la próxima revisión (cada 15 minutos con Wi-Fi, al
    empezar a cargar o al abrir la app).
@@ -81,8 +83,18 @@ La segunda corre el núcleo Kotlin contra el servidor Rust real: emparejamiento,
 fijado, descargas que se retoman, mover sin volver a descargar, borrados con confirmación,
 avisos SSE y desvinculación. No necesita el SDK de Android.
 
-La CI (`.github/workflows/ci.yml`) corre todo eso, compila el APK y el instalador de Windows y
-los deja como artefactos de cada ejecución.
+La CI (`.github/workflows/ci.yml`) corre todo eso, compila el APK y el instalador de Windows, y
+además prueba la app en un emulador Android 14 contra el servidor Rust
+(`.github/scripts/android-e2e.sh`): se vincula abriendo el enlace del QR, descarga y le informa a
+la PC, abre la conexión de espera mientras carga, baja al instante un audio nuevo después de
+Sincronizar y reproduce una playlist con la PC apagada. El APK, el instalador y las capturas del
+emulador quedan como artefactos de cada ejecución.
+
+En la PC de desarrollo también se puede abrir el enlace del QR en un celular o emulador conectado:
+
+```bash
+adb shell "am start -a android.intent.action.VIEW -d 'cyberia://pair?...'"
+```
 
 ## Estado del MVP
 
@@ -95,6 +107,10 @@ los deja como artefactos de cada ejecución.
 | Modo espera mientras carga, revisión periódica, nunca datos móviles (RF-40 a RF-42) | Hecho |
 | Mover o renombrar sin volver a descargar (RF-27, v1) | Hecho de paso: los audios se identifican por huella |
 | Reactivar el modo espera al reiniciar el celular (RF-44, v1) | Hecho de paso |
+
+**Medido hasta ahora:** el instalador de Windows pesa 2,4 MB (RNF-02 pide menos de 15). En Linux,
+con la ventana cerrada, la app de bandeja usa 28 MB de memoria propia; el resto de lo que muestra
+el sistema son librerías compartidas de WebKitGTK. En Windows (WebView2) falta medirlo (RNF-01).
 
 **Falta probar en celulares reales** (criterios de salida de las fases 0 a 3): que la espera
 sobreviva una hora en al menos dos marcas, 100 audios sin errores, una playlist entera con el
