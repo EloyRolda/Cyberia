@@ -38,6 +38,13 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- El QR de la PC también se puede escanear con la cámara del sistema. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="cyberia" android:host="pair" />
+            </intent-filter>
         </activity>
 
         <!-- Modo espera: mantiene la conexión de avisos con la PC mientras el celular carga (RF-40). -->

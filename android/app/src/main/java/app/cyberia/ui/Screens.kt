@@ -91,12 +91,48 @@ fun CyberiaRoot(
     ignoringBatteryOptimizations: Boolean,
 ) {
     val pc by vm.pairedPc.collectAsStateWithLifecycle()
+    val pairing by vm.pairing.collectAsStateWithLifecycle()
     val current = pc
     if (current == null) {
-        val pairing by vm.pairing.collectAsStateWithLifecycle()
         PairingScreen(pairing, onScan)
     } else {
         LibraryScreen(vm, current, onBatterySettings, ignoringBatteryOptimizations)
+    }
+
+    when (val state = pairing) {
+        is PairingUi.Confirm -> AlertDialog(
+            onDismissRequest = vm::clearPairingError,
+            title = { Text("¿Vincular con ${state.info.pcName}?") },
+            text = {
+                Text(
+                    if (state.replacing != null) {
+                        "Reemplaza la vinculación con ${state.replacing}. Los audios descargados se mantienen."
+                    } else {
+                        "Este celular va a recibir los audios que publique esa PC."
+                    },
+                )
+            },
+            confirmButton = { TextButton(onClick = vm::confirmPairing) { Text("Vincular") } },
+            dismissButton = { TextButton(onClick = vm::clearPairingError) { Text("Cancelar") } },
+        )
+        // Con una PC ya vinculada, el progreso y los errores de vinculación van en un diálogo.
+        is PairingUi.Working -> if (current != null) {
+            AlertDialog(
+                onDismissRequest = {},
+                title = { Text("Vinculando con ${state.pcName}…") },
+                text = { LinearProgressIndicator(modifier = Modifier.fillMaxWidth()) },
+                confirmButton = {},
+            )
+        }
+        is PairingUi.Error -> if (current != null) {
+            AlertDialog(
+                onDismissRequest = vm::clearPairingError,
+                title = { Text("No se pudo vincular") },
+                text = { Text(state.message) },
+                confirmButton = { TextButton(onClick = vm::clearPairingError) { Text("Entendido") } },
+            )
+        }
+        PairingUi.Idle -> Unit
     }
 }
 

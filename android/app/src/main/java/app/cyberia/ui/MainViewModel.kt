@@ -28,6 +28,9 @@ data class PlaylistGroup(val name: String, val tracks: List<TrackEntity>) {
 
 sealed interface PairingUi {
     data object Idle : PairingUi
+
+    /** Un enlace `cyberia://pair` abrió la app: se pide confirmación antes de vincular. */
+    data class Confirm(val info: PairingInfo, val replacing: String?) : PairingUi
     data class Working(val pcName: String) : PairingUi
     data class Error(val message: String) : PairingUi
 }
@@ -64,15 +67,41 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             prefs.batteryTipDismissed = value
         }
 
-    /** Resultado del escáner de QR (RF-03). */
+    /** Resultado del escáner de QR de la app (RF-03). */
     fun onScanned(text: String?) {
-        if (text.isNullOrBlank()) return
-        val info = try {
+        val info = parsePairing(text) ?: return
+        pair(info)
+    }
+
+    /**
+     * Enlace `cyberia://pair` (por ejemplo, el QR leído con la cámara del sistema). Como lo puede
+     * abrir cualquier app o página, se pide confirmación antes de vincular.
+     */
+    fun onPairingLink(text: String?, autoConfirm: Boolean = false) {
+        val info = parsePairing(text) ?: return
+        if (autoConfirm) {
+            pair(info)
+        } else {
+            _pairing.value = PairingUi.Confirm(info, replacing = pairedPc.value?.pcName)
+        }
+    }
+
+    fun confirmPairing() {
+        val state = _pairing.value
+        if (state is PairingUi.Confirm) pair(state.info)
+    }
+
+    private fun parsePairing(text: String?): PairingInfo? {
+        if (text.isNullOrBlank()) return null
+        return try {
             PairingInfo.parse(text)
         } catch (e: IllegalArgumentException) {
             _pairing.value = PairingUi.Error(e.message ?: "Ese QR no es de Cyberia.")
-            return
+            null
         }
+    }
+
+    private fun pair(info: PairingInfo) {
         _pairing.value = PairingUi.Working(info.pcName)
         viewModelScope.launch {
             try {

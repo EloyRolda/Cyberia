@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
+import app.cyberia.BuildConfig
 import app.cyberia.graph
 import app.cyberia.sync.StandbyService
 import app.cyberia.sync.SyncWorker
@@ -24,6 +25,10 @@ import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 
 class MainActivity : ComponentActivity() {
+    companion object {
+        const val EXTRA_TEST_AUTO_CONFIRM = "cyberia.test.autoConfirm"
+    }
+
     private val vm: MainViewModel by viewModels()
 
     private var ignoringBatteryOptimizations by mutableStateOf(true)
@@ -46,6 +51,8 @@ class MainActivity : ComponentActivity() {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
 
+        if (savedInstanceState == null) handlePairingLink(intent)
+
         setContent {
             CyberiaTheme {
                 CyberiaRoot(
@@ -56,6 +63,21 @@ class MainActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handlePairingLink(intent)
+    }
+
+    /** `cyberia://pair?...`: el QR de la PC abierto como enlace. */
+    private fun handlePairingLink(intent: Intent?) {
+        val data = intent?.data ?: return
+        if (data.scheme != "cyberia" || data.host != "pair") return
+        // Solo en compilaciones de prueba: la CI vincula el emulador sin tocar la pantalla.
+        val autoConfirm = BuildConfig.DEBUG && intent.getBooleanExtra(EXTRA_TEST_AUTO_CONFIRM, false)
+        vm.onPairingLink(data.toString(), autoConfirm)
+        intent.data = null
     }
 
     override fun onStart() {

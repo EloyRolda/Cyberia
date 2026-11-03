@@ -103,3 +103,45 @@ jobs:
           name: cyberia-windows-installer
           path: target/release/bundle/nsis/*.exe
           if-no-files-found: error
+
+  android-e2e:
+    name: Android en emulador (vincular, sincronizar y aviso al instante)
+    needs: android
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Habilitar KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Servidor sin interfaz
+        run: cargo build -p cyberia-server --locked
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: cyberia-android-debug
+          path: apk
+
+      - name: Prueba en el emulador
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          target: google_apis
+          arch: x86_64
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none -no-snapshot
+          script: bash .github/scripts/android-e2e.sh "$(ls apk/*.apk | head -1)" target/debug/cyberia-server
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-e2e
+          path: e2e-out
+          if-no-files-found: warn
