@@ -3,6 +3,8 @@
 # celular se vincula, descarga, informa y recibe un aviso al instante por la conexión de espera.
 # Uso: android-e2e.sh <apk> <cyberia-server>
 set -euo pipefail
+# Escribir al servidor cuando ya terminó no tiene que matar el script.
+trap '' PIPE
 
 APK="$1"
 SERVER="$2"
@@ -31,6 +33,31 @@ mkfifo "$WORK/server.in"
 SERVER_PID=$!
 exec 3> "$WORK/server.in"
 trap 'echo quit >&3 || true; kill $SERVER_PID 2>/dev/null || true; adb logcat -d > "$OUT/logcat.txt" 2>/dev/null || true' EXIT
+
+shot() { # shot <nombre>: captura de pantalla en $OUT (y en el log si E2E_PRINT_SCREENSHOTS=1)
+  adb exec-out screencap -p > "$OUT/$1.png"
+  if [ -n "${E2E_PRINT_SCREENSHOTS:-}" ] && command -v convert >/dev/null; then
+    echo "SCREENSHOT $1 $(convert "$OUT/$1.png" -resize 432x -quality 70 jpg:- | base64 -w0)"
+  fi
+}
+
+tap_desc() { # tap_desc <descripción>: toca el elemento con esa descripción de accesibilidad
+  adb shell uiautomator dump /sdcard/ui.xml >/dev/null
+  adb pull /sdcard/ui.xml "$WORK/ui.xml" >/dev/null
+  local xy
+  xy="$(python3 - "$WORK/ui.xml" "$1" <<'PY'
+import re, sys, xml.etree.ElementTree as ET
+root = ET.parse(sys.argv[1]).getroot()
+for node in root.iter("node"):
+    if node.get("content-desc") == sys.argv[2]:
+        x1, y1, x2, y2 = map(int, re.findall(r"\d+", node.get("bounds")))
+        print((x1 + x2) // 2, (y1 + y2) // 2)
+        break
+PY
+)"
+  [ -n "$xy" ] || { echo "No encontré «$1» en la pantalla"; return 1; }
+  adb shell input tap $xy
+}
 
 wait_for() { # wait_for <segundos> <comando...>
   local deadline=$((SECONDS + $1)); shift
@@ -77,7 +104,7 @@ if ! wait_for 120 check_first; then
   echo "El celular no informó 3 audios descargados"; status; exit 1
 fi
 echo "OK: llegaron 3 audios"
-adb exec-out screencap -p > "$OUT/01-biblioteca.png"
+shot 01-biblioteca
 
 echo "== Aviso al instante con el modo espera (celular cargando)"
 python3 - "$WORK/music/Podcasts/Episodio 2.wav" <<'PY'
@@ -97,12 +124,23 @@ if ! wait_for 60 check_push; then
   echo "El celular no descargó el audio nuevo después del aviso"; status; exit 1
 fi
 echo "OK: el audio nuevo llegó por el aviso"
-adb exec-out screencap -p > "$OUT/02-audio-nuevo.png"
+shot 02-audio-nuevo
 
 echo "== Reproducción"
-adb shell input keyevent KEYCODE_MEDIA_PLAY || true
-sleep 3
-adb exec-out screencap -p > "$OUT/03-reproductor.png"
+# Reproduce la playlist «Para correr» desde la app, con la PC apagada (RF-30).
+kill $SERVER_PID 2>/dev/null || true
+tap_desc "Reproducir Para correr"
+playing() { adb shell dumpsys media_session | grep -q "state=PlaybackState {state=3"; }
+if ! wait_for 30 playing; then
+  echo "El reproductor no empezó a sonar"; adb shell dumpsys media_session | head -60; exit 1
+fi
+echo "OK: suena la playlist sin la PC"
+sleep 2
+shot 03-reproductor
+adb shell cmd statusbar expand-notifications || true
+sleep 2
+shot 04-notificaciones
+adb shell cmd statusbar collapse || true
 
 if adb logcat -d | grep -A 20 "FATAL EXCEPTION" | grep -q "app.cyberia"; then
   echo "La app se cerró con un error"; adb logcat -d | grep -A 30 "FATAL EXCEPTION"; exit 1
