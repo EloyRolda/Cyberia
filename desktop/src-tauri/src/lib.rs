@@ -15,12 +15,14 @@ use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WebviewUrl, WebviewWin
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_opener::OpenerExt;
 
+mod updates;
+
 const MAIN_WINDOW: &str = "main";
 const TRAY_ID: &str = "cyberia";
 const EVENT_NAME: &str = "cyberia://event";
 
-struct AppState {
-    core: Arc<Core>,
+pub(crate) struct AppState {
+    pub(crate) core: Arc<Core>,
     server_error: Mutex<Option<String>>,
 }
 
@@ -32,6 +34,7 @@ struct UiState {
     snapshot: Snapshot,
     server_error: Option<String>,
     default_folder: String,
+    app_version: String,
 }
 
 fn ui_state(app: &AppHandle, state: &AppState) -> UiState {
@@ -39,6 +42,7 @@ fn ui_state(app: &AppHandle, state: &AppState) -> UiState {
         snapshot: state.core.snapshot(),
         server_error: state.server_error.lock().unwrap().clone(),
         default_folder: default_folder(app).display().to_string(),
+        app_version: app.package_info().version.to_string(),
     }
 }
 
@@ -127,12 +131,13 @@ fn show_main_window(app: &AppHandle) {
     }
 }
 
-fn build_tray(app: &AppHandle) -> tauri::Result<()> {
+fn build_tray(app: &AppHandle, auto_update: bool) -> tauri::Result<()> {
     let open = MenuItem::with_id(app, "open", "Abrir Cyberia", true, None::<&str>)?;
     let sync = MenuItem::with_id(app, "sync", "Sincronizar ahora", true, None::<&str>)?;
+    let update = MenuItem::with_id(app, "update", "Buscar actualizaciones", auto_update, None::<&str>)?;
     let quit = MenuItem::with_id(app, "quit", "Salir", true, None::<&str>)?;
     let separator = PredefinedMenuItem::separator(app)?;
-    let menu = Menu::with_items(app, &[&open, &sync, &separator, &quit])?;
+    let menu = Menu::with_items(app, &[&open, &sync, &update, &separator, &quit])?;
 
     let mut builder = TrayIconBuilder::with_id(TRAY_ID)
         .tooltip("Cyberia")
@@ -145,6 +150,24 @@ fn build_tray(app: &AppHandle) -> tauri::Result<()> {
                 tauri::async_runtime::spawn(async move {
                     if let Err(err) = core.sync_now().await {
                         tracing::warn!("no se pudo sincronizar: {err}");
+                    }
+                });
+            }
+            "update" => {
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    match updates::check_and_install(&app).await {
+                        Ok(false) => {
+                            let version = app.package_info().version.to_string();
+                            let _ = app
+                                .notification()
+                                .builder()
+                                .title("Cyberia está al día")
+                                .body(format!("Tenés la última versión ({version})."))
+                                .show();
+                        }
+                        Ok(true) => {}
+                        Err(err) => tracing::warn!("no se pudo actualizar: {err:#}"),
                     }
                 });
             }
@@ -215,14 +238,24 @@ pub fn run() {
         )
         .init();
 
-    let app = tauri::Builder::default()
+    let context = tauri::generate_context!();
+    // La CI agrega la configuración del actualizador solo cuando tiene la clave para firmar las
+    // versiones. Sin ella (por ejemplo, en desarrollo) la app no se actualiza sola.
+    let auto_update = updates::configured(&context);
+
+    let mut builder = tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
             show_main_window(app);
         }))
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
-        .plugin(tauri_plugin_notification::init())
-        .setup(|app| {
+        .plugin(tauri_plugin_notification::init());
+    if auto_update {
+        builder = builder.plugin(tauri_plugin_updater::Builder::new().build());
+    }
+
+    let app = builder
+        .setup(move |app| {
             let data_dir = app.path().app_data_dir()?;
             let core = Core::open(CoreOptions::new(data_dir))?;
             app.manage(AppState {
@@ -279,7 +312,10 @@ pub fn run() {
                 let _ = handle.emit(EVENT_NAME, &CoreEvent::StateChanged);
             });
 
-            build_tray(app.handle())?;
+            build_tray(app.handle(), auto_update)?;
+            if auto_update {
+                tauri::async_runtime::spawn(updates::run(app.handle().clone()));
+            }
             show_main_window(app.handle());
             Ok(())
         })
@@ -294,7 +330,7 @@ pub fn run() {
             create_default_folder,
             open_folder,
         ])
-        .build(tauri::generate_context!())
+        .build(context)
         .expect("no se pudo iniciar Cyberia");
 
     app.run(|app, event| match event {

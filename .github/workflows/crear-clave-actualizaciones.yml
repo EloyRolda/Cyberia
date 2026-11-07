@@ -1,0 +1,60 @@
+name: Crear clave de actualizaciones
+
+# Se corre UNA sola vez, a mano (Actions → «Crear clave de actualizaciones» → Run workflow).
+# Genera la clave con la que se firman las versiones de la app de PC. La PC solo instala una
+# actualización si viene firmada con esta clave, así que no hay que cambiarla nunca.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  clave:
+    name: Generar la clave
+    runs-on: ubuntu-24.04
+    steps:
+      - name: No pisar una clave existente
+        env:
+          EXISTENTE: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -n "$EXISTENTE" ]; then
+            echo "::error::Ya hay una clave de actualizaciones. Si se cambia, las PC instaladas no van a aceptar las versiones nuevas y habría que reinstalarlas a mano."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: desktop/package-lock.json
+
+      - name: Generar
+        working-directory: desktop
+        run: |
+          npm ci --silent
+          mkdir -p ../clave
+          PASS="$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32)"
+          echo "::add-mask::$PASS"
+          npx tauri signer generate --ci -w ../clave/updater.key -p "$PASS" > /dev/null
+          cd ../clave
+          cp updater.key TAURI_SIGNING_PRIVATE_KEY.txt
+          printf '%s' "$PASS" > TAURI_SIGNING_PRIVATE_KEY_PASSWORD.txt
+          cp updater.key.pub TAURI_UPDATER_PUBKEY.txt
+          rm updater.key updater.key.pub
+          cat > LEEME.txt <<'TXT'
+          1. En GitHub, abrí el repositorio Cyberia → Settings → Secrets and variables → Actions.
+          2. Creá tres secretos (New repository secret), copiando el contenido completo de cada archivo:
+             - TAURI_SIGNING_PRIVATE_KEY          ← TAURI_SIGNING_PRIVATE_KEY.txt
+             - TAURI_SIGNING_PRIVATE_KEY_PASSWORD ← TAURI_SIGNING_PRIVATE_KEY_PASSWORD.txt
+             - TAURI_UPDATER_PUBKEY               ← TAURI_UPDATER_PUBKEY.txt
+          3. Borrá estos archivos de tu computadora. El artefacto se borra solo en un día.
+          TXT
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: clave-de-actualizaciones
+          path: clave/
+          retention-days: 1

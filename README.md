@@ -52,6 +52,32 @@ los secretos de GitHub, nunca en el repositorio:
 
 Sin esos secretos la CI sigue funcionando, pero firma con una clave temporal y lo avisa.
 
+### Actualizaciones de la PC
+
+La app de PC se actualiza sola: cada push a `main` que pasa la CI se publica en el repositorio
+público [`EloyRolda/Cyberia-releases`](https://github.com/EloyRolda/Cyberia-releases) (solo los
+instaladores, no el código). Cyberia revisa al arrancar y cada 6 horas (o con **Buscar
+actualizaciones** en el menú de la bandeja); si hay una versión nueva, la baja, verifica su firma,
+la instala y se vuelve a abrir. Como esa versión trae el APK nuevo, después el celular también se
+actualiza desde la PC.
+
+Links fijos a la última versión, para instalar por primera vez:
+
+- PC: https://github.com/EloyRolda/Cyberia-releases/releases/latest/download/Cyberia-setup.exe
+- Celular: https://github.com/EloyRolda/Cyberia-releases/releases/latest/download/Cyberia.apk
+
+Configuración (una sola vez):
+
+1. Crear el repositorio **público** `Cyberia-releases`, con un README para que no quede vacío.
+2. Crear un token *fine-grained* (GitHub → Settings → Developer settings → Fine-grained tokens)
+   con acceso solo a `Cyberia-releases` y permiso **Contents: Read and write**. Cargarlo en este
+   repositorio como secreto `RELEASES_TOKEN`.
+3. Correr **Actions → Crear clave de actualizaciones** y cargar los tres secretos que trae el
+   artefacto, como indica su `LEEME.txt`.
+4. Instalar a mano, una última vez, la primera versión publicada. Las siguientes llegan solas.
+
+Sin esos secretos la CI sigue armando el instalador, pero sin actualizador, y no publica nada.
+
 ## Estructura
 
 | Carpeta | Qué hay |

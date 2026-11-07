@@ -92,6 +92,7 @@ interface UiState {
   androidApp: AndroidApp | null;
   serverError: string | null;
   defaultFolder: string;
+  appVersion: string;
 }
 
 interface SyncOutcome {
@@ -208,9 +209,9 @@ function render(): void {
   if (!state) return;
   const s = state;
 
-  $("pc-name").textContent = s.port
-    ? `${s.pcName} · puerto ${s.port}`
-    : s.pcName;
+  $("pc-name").textContent = [s.pcName, s.port ? `puerto ${s.port}` : null, `versión ${s.appVersion}`]
+    .filter(Boolean)
+    .join(" · ");
 
   const pill = $("phone-pill");
   if (!s.device) {
