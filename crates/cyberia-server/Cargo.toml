@@ -1,0 +1,14 @@
+[package]
+name = "cyberia-server"
+description = "Servidor de Cyberia sin interfaz, para desarrollo y pruebas."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+cyberia-core = { path = "../cyberia-core" }
+anyhow.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true

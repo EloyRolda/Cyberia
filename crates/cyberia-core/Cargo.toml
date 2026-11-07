@@ -1,0 +1,36 @@
+[package]
+name = "cyberia-core"
+description = "Núcleo de Cyberia para la PC: índice de la carpeta, manifiesto, emparejamiento y API HTTPS local."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+anyhow.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+axum = "0.8"
+axum-server = { version = "0.7", default-features = false, features = ["tls-rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["ring", "std", "tls12", "logging"] }
+tower = { version = "0.5", features = ["util"] }
+tower-http = { version = "0.6", features = ["fs"] }
+futures-util = "0.3"
+rcgen = "0.13"
+sha2 = "0.10"
+blake3 = "1.5"
+rand = "0.8"
+base64 = "0.22"
+mdns-sd = "0.13"
+if-addrs = "0.13"
+qrcode = { version = "0.14", default-features = false, features = ["svg"] }
+walkdir = "2"
+gethostname = "0.5"
+urlencoding = "2"
+hex = "0.4"
+
+[dev-dependencies]
+tempfile = "3"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "stream"] }

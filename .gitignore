@@ -1,0 +1,30 @@
+# Rust
+/target/
+
+# Node / frontend de la PC
+node_modules/
+/desktop/dist/
+
+# Gradle / Android
+.gradle/
+build/
+local.properties
+*.iml
+.idea/
+.kotlin/
+captures/
+*.apk
+*.aab
+*.keystore
+!debug.keystore
+
+# Datos de pruebas locales
+cyberia-data/
+.DS_Store
+
+# App del celular que copia la CI para el instalador
+/desktop/src-tauri/resources/cyberia.apk
+/desktop/src-tauri/resources/cyberia-apk.json
+
+# Claves de firma: van en los secretos de la CI, nunca en el repo
+*.jks
