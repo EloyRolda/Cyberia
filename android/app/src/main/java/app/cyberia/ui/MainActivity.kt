@@ -3,6 +3,7 @@ package app.cyberia.ui
 import android.Manifest
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.PowerManager
@@ -16,19 +17,15 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
-import app.cyberia.BuildConfig
 import app.cyberia.graph
 import app.cyberia.sync.StandbyService
 import app.cyberia.sync.SyncWorker
 import app.cyberia.sync.Trigger
+import app.cyberia.update.UpdateUi
 import com.journeyapps.barcodescanner.ScanContract
 import com.journeyapps.barcodescanner.ScanOptions
 
 class MainActivity : ComponentActivity() {
-    companion object {
-        const val EXTRA_TEST_AUTO_CONFIRM = "cyberia.test.autoConfirm"
-    }
-
     private val vm: MainViewModel by viewModels()
 
     private var ignoringBatteryOptimizations by mutableStateOf(true)
@@ -59,6 +56,7 @@ class MainActivity : ComponentActivity() {
                     vm = vm,
                     onScan = ::scanQr,
                     onBatterySettings = ::openBatterySettings,
+                    onAllowInstalls = ::openInstallSettings,
                     ignoringBatteryOptimizations = ignoringBatteryOptimizations,
                 )
             }
@@ -74,14 +72,16 @@ class MainActivity : ComponentActivity() {
     private fun handlePairingLink(intent: Intent?) {
         val data = intent?.data ?: return
         if (data.scheme != "cyberia" || data.host != "pair") return
-        // Solo en compilaciones de prueba: la CI vincula el emulador sin tocar la pantalla.
-        val autoConfirm = BuildConfig.DEBUG && intent.getBooleanExtra(EXTRA_TEST_AUTO_CONFIRM, false)
-        vm.onPairingLink(data.toString(), autoConfirm)
+        vm.onPairingLink(data.toString())
         intent.data = null
     }
 
     override fun onStart() {
         super.onStart()
+        // Volvió de dar el permiso de instalar apps: sigue con la actualización.
+        if (graph.updates.state.value is UpdateUi.NeedsPermission && packageManager.canRequestPackageInstalls()) {
+            vm.installUpdate()
+        }
         ignoringBatteryOptimizations = getSystemService(PowerManager::class.java)
             ?.isIgnoringBatteryOptimizations(packageName) ?: true
         if (graph.prefs.pairedPc.value != null) {
@@ -102,6 +102,12 @@ class MainActivity : ComponentActivity() {
                 .setBeepEnabled(false)
                 .setOrientationLocked(false),
         )
+    }
+
+    /** Permiso de Android para que Cyberia instale sus actualizaciones (se da una sola vez). */
+    private fun openInstallSettings() {
+        val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES, Uri.parse("package:$packageName"))
+        runCatching { startActivity(intent) }.onFailure { startActivity(Intent(Settings.ACTION_SETTINGS)) }
     }
 
     /** Guía para excluir a Cyberia de la optimización de batería (riesgo principal del MVP). */

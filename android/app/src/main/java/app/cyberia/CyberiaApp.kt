@@ -13,6 +13,7 @@ class CyberiaApp : Application() {
         super.onCreate()
         graph = AppGraph(this)
         Notifications.createChannels(this)
+        graph.updates.cleanUpAfterUpdate()
         // Revisión periódica cada 15 minutos, solo con Wi-Fi (RF-41).
         SyncWorker.schedulePeriodic(this)
     }

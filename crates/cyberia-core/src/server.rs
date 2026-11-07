@@ -78,6 +78,7 @@ pub(crate) fn router(core: Arc<Core>) -> Router {
         .route("/v1/files/{id}", get(file))
         .route("/v1/events", get(events))
         .route("/v1/report", post(report))
+        .route("/v1/app/android", get(android_app))
         .layer(middleware::from_fn(local_only))
         .with_state(core)
 }
@@ -163,12 +164,13 @@ async fn unpair(State(core): State<AppState>, _auth: Authed) -> Response {
 }
 
 async fn info(State(core): State<AppState>, _auth: Authed) -> Response {
-    let (pc_id, pc_name, version) = core.info();
+    let (pc_id, pc_name, version, android_app) = core.info();
     Json(json!({
         "apiVersion": crate::API_VERSION,
         "pcId": pc_id,
         "pcName": pc_name,
         "manifestVersion": version,
+        "androidApp": android_app,
     }))
     .into_response()
 }
@@ -248,6 +250,24 @@ async fn events(State(core): State<AppState>, _auth: Authed) -> Sse<impl Stream<
         },
     );
     Sse::new(stream).keep_alive(KeepAlive::new().interval(KEEP_ALIVE).text(""))
+}
+
+/// La app del celular que trae esta PC, para que el celular se actualice sin cables.
+async fn android_app(State(core): State<AppState>, _auth: Authed, req: Request) -> Response {
+    let Some(app) = core.android_app() else {
+        return error(StatusCode::NOT_FOUND, "no_app", "Esta PC no trae la app del celular.");
+    };
+    match ServeFile::new(&app.path).oneshot(req).await {
+        Ok(res) => {
+            let (mut parts, body) = res.into_parts();
+            parts.headers.insert(
+                header::CONTENT_TYPE,
+                header::HeaderValue::from_static("application/vnd.android.package-archive"),
+            );
+            Response::from_parts(parts, Body::new(body))
+        }
+        Err(never) => match never {},
+    }
 }
 
 fn version_event(version: u64) -> Event {

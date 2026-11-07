@@ -39,7 +39,7 @@ data class SyncResult(
     /** Se pudo informar el resultado a la PC. */
     val reported: Boolean,
 ) {
-    fun toReport(): SyncReport = SyncReport(
+    fun toReport(appVersionCode: Long? = null, appVersionName: String? = null): SyncReport = SyncReport(
         manifestVersion = manifestVersion,
         downloaded = downloaded.map { ReportItem(it.id, it.path) },
         deleted = deleted.map { ReportItem(it.id, it.path) },
@@ -50,6 +50,8 @@ data class SyncResult(
         libraryCount = libraryCount,
         libraryBytes = libraryBytes,
         complete = complete,
+        appVersionCode = appVersionCode,
+        appVersionName = appVersionName,
     )
 }
 
@@ -73,6 +75,9 @@ class SyncEngine(
     private val freeSpace: () -> Long,
     /** Espacio que se deja siempre libre en el celular. */
     private val reserveBytes: Long = 200L * 1024 * 1024,
+    /** Versión de la app, para que la PC sepa si el celular está al día. */
+    private val appVersionCode: Long? = null,
+    private val appVersionName: String? = null,
 ) {
     private val mutex = Mutex()
 
@@ -91,7 +96,7 @@ class SyncEngine(
             client.download(endpoint, token, file.id, target, file.size, progress)
         }
         val reported = try {
-            client.report(endpoint, token, result.toReport())
+            client.report(endpoint, token, result.toReport(appVersionCode, appVersionName))
             true
         } catch (e: CancellationException) {
             throw e

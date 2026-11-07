@@ -32,8 +32,13 @@
     "windows": {
       "nsis": {
         "installMode": "currentUser",
-        "languages": ["Spanish"]
+        "languages": [
+          "Spanish"
+        ]
       }
-    }
+    },
+    "resources": [
+      "resources/*"
+    ]
   }
 }

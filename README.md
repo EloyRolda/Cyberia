@@ -22,6 +22,36 @@ Los requisitos completos están en [`DataToStart/Cyberia — Requisitos funciona
    empezar a cargar o al abrir la app).
 4. La PC confirma cuántos audios llegaron y, si algo falló, cuál y por qué.
 
+## Actualizaciones
+
+El celular se actualiza desde la PC, sin cables ni archivos que pasar:
+
+1. Cada corrida de la CI arma una versión nueva (el número de corrida es la versión) y mete el
+   APK del celular dentro del instalador de Windows.
+2. Instalás el instalador nuevo en la PC, encima del anterior. La configuración, la carpeta y la
+   vinculación se mantienen.
+3. La próxima vez que el celular se conecta, ve que la PC trae una versión más nueva, avisa con
+   una notificación y muestra **Actualizar**. La baja por el Wi-Fi, verifica su SHA-256 y abre el
+   instalador de Android.
+
+La primera vez, Android pide permitir que Cyberia instale apps y confirmar la instalación. Desde
+Android 12, las siguientes actualizaciones ya no piden confirmar.
+
+### Clave de firma (una sola vez)
+
+Android solo acepta una actualización si está firmada con la misma clave que la versión
+instalada; si no, hay que desinstalar y se pierden la vinculación y los audios. La clave vive en
+los secretos de GitHub, nunca en el repositorio:
+
+1. En GitHub: **Actions → Crear clave de firma → Run workflow**.
+2. Bajá el artefacto `clave-de-firma` y seguí su `LEEME.txt`: son dos secretos,
+   `CYBERIA_KEYSTORE_BASE64` y `CYBERIA_KEYSTORE_PASSWORD`, en **Settings → Secrets and variables
+   → Actions**.
+3. Desde la próxima corrida, todas las versiones salen firmadas con esa clave. Las versiones
+   anteriores a la clave hay que desinstalarlas una vez.
+
+Sin esos secretos la CI sigue funcionando, pero firma con una clave temporal y lo avisa.
+
 ## Estructura
 
 | Carpeta | Qué hay |
@@ -67,7 +97,8 @@ cargo run -p cyberia-server -- --folder ~/Música/Cyberia --pair
 cd android && ./gradlew :app:assembleDebug
 ```
 
-El APK queda en `android/app/build/outputs/apk/debug/`.
+El APK queda en `android/app/build/outputs/apk/debug/`. La versión que se distribuye es la de
+release (`./gradlew :app:assembleRelease`), que es la que prueba la CI.
 
 ### Pruebas
 
@@ -87,8 +118,10 @@ La CI (`.github/workflows/ci.yml`) corre todo eso, compila el APK y el instalado
 además prueba la app en un emulador Android 14 contra el servidor Rust
 (`.github/scripts/android-e2e.sh`): se vincula abriendo el enlace del QR, descarga y le informa a
 la PC, abre la conexión de espera mientras carga, baja al instante un audio nuevo después de
-Sincronizar y reproduce una playlist con la PC apagada. El APK, el instalador y las capturas del
-emulador quedan como artefactos de cada ejecución.
+Sincronizar y reproduce una playlist con la PC apagada. También prueba la actualización: la PC
+vuelve con una versión más nueva, el celular la baja, se instala encima y sigue vinculado y con
+sus audios. El APK, el instalador y las capturas del emulador quedan como artefactos de cada
+ejecución.
 
 En la PC de desarrollo también se puede abrir el enlace del QR en un celular o emulador conectado:
 

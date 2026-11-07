@@ -15,6 +15,7 @@ import app.cyberia.data.AppPrefs
 import app.cyberia.data.LastSync
 import app.cyberia.net.PcLocator
 import app.cyberia.net.WifiNetworks
+import app.cyberia.update.UpdateManager
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -47,6 +48,7 @@ class SyncManager(
     private val prefs: AppPrefs,
     private val engine: SyncEngine,
     private val locator: PcLocator,
+    private val updates: UpdateManager,
 ) {
     private val running = Mutex()
 
@@ -192,6 +194,9 @@ class SyncManager(
     ): SyncResult {
         _status.value = SyncStatus.Syncing(null)
         val client = CyberiaClient(pc.fingerprint, network.socketFactory)
+        // ¿La PC trae una versión nueva de la app? Si falla, se sigue igual con los audios.
+        runCatching { client.info(endpoint, pc.token) }
+            .onSuccess { updates.onPcOffer(it.androidApp, pc.pcName) }
         val result = engine.sync(client, endpoint, pc.token, allowLargeDeletion) { progress ->
             _status.value = SyncStatus.Syncing(progress)
         }

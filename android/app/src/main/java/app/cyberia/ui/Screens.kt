@@ -74,6 +74,7 @@ import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
 import app.cyberia.R
+import app.cyberia.core.AndroidAppInfo
 import app.cyberia.core.PairedPc
 import app.cyberia.core.PendingDeletion
 import app.cyberia.data.LastSync
@@ -81,6 +82,7 @@ import app.cyberia.data.TrackEntity
 import app.cyberia.data.title
 import app.cyberia.player.PlayerUi
 import app.cyberia.sync.SyncStatus
+import app.cyberia.update.UpdateUi
 import kotlinx.coroutines.delay
 
 @Composable
@@ -88,6 +90,7 @@ fun CyberiaRoot(
     vm: MainViewModel,
     onScan: () -> Unit,
     onBatterySettings: () -> Unit,
+    onAllowInstalls: () -> Unit,
     ignoringBatteryOptimizations: Boolean,
 ) {
     val pc by vm.pairedPc.collectAsStateWithLifecycle()
@@ -96,7 +99,7 @@ fun CyberiaRoot(
     if (current == null) {
         PairingScreen(pairing, onScan)
     } else {
-        LibraryScreen(vm, current, onBatterySettings, ignoringBatteryOptimizations)
+        LibraryScreen(vm, current, onBatterySettings, onAllowInstalls, ignoringBatteryOptimizations)
     }
 
     when (val state = pairing) {
@@ -206,9 +209,12 @@ fun LibraryScreen(
     vm: MainViewModel,
     pc: PairedPc,
     onBatterySettings: () -> Unit,
+    onAllowInstalls: () -> Unit,
     ignoringBatteryOptimizations: Boolean,
 ) {
     val playlists by vm.playlists.collectAsStateWithLifecycle()
+    val update by vm.availableUpdate.collectAsStateWithLifecycle()
+    val updateState by vm.updateState.collectAsStateWithLifecycle()
     val status by vm.syncStatus.collectAsStateWithLifecycle()
     val lastSync by vm.lastSync.collectAsStateWithLifecycle()
     val pending by vm.pendingDeletion.collectAsStateWithLifecycle()
@@ -271,6 +277,11 @@ fun LibraryScreen(
                                 },
                             )
                             DropdownMenuItem(
+                                text = { Text("Cyberia ${vm.versionName}") },
+                                onClick = {},
+                                enabled = false,
+                            )
+                            DropdownMenuItem(
                                 text = { Text("Desvincular de ${pc.pcName}") },
                                 onClick = {
                                     menuOpen = false
@@ -302,6 +313,17 @@ fun LibraryScreen(
             ) {
                 item(key = "status") {
                     StatusCard(status, lastSync, pc, onDismissError = vm::clearSyncError)
+                }
+                update?.let { u ->
+                    item(key = "update") {
+                        UpdateCard(
+                            update = u,
+                            state = updateState,
+                            currentVersion = vm.versionName,
+                            onInstall = vm::installUpdate,
+                            onAllow = onAllowInstalls,
+                        )
+                    }
                 }
                 pending?.let { p ->
                     item(key = "pending") {
@@ -462,6 +484,53 @@ private fun StatusCard(status: SyncStatus, lastSync: LastSync?, pc: PairedPc, on
                             )
                         }
                     }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun UpdateCard(
+    update: AndroidAppInfo,
+    state: UpdateUi,
+    currentVersion: String,
+    onInstall: () -> Unit,
+    onAllow: () -> Unit,
+) {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 16.dp, vertical = 8.dp),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text("Versión nueva: Cyberia ${update.versionName}", style = MaterialTheme.typography.titleSmall)
+            Text(
+                "Está en tu PC (${formatBytes(update.size)}). Se instala encima de la $currentVersion: " +
+                    "no se pierden la vinculación ni los audios.",
+                style = MaterialTheme.typography.bodySmall,
+            )
+            when (state) {
+                UpdateUi.Idle -> Button(onClick = onInstall) { Text("Actualizar") }
+                is UpdateUi.Downloading -> {
+                    Text("Bajando de la PC… ${(state.fraction * 100).toInt()} %", style = MaterialTheme.typography.bodySmall)
+                    LinearProgressIndicator(progress = { state.fraction }, modifier = Modifier.fillMaxWidth())
+                }
+                UpdateUi.Installing -> {
+                    Text("Abriendo el instalador de Android…", style = MaterialTheme.typography.bodySmall)
+                    LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
+                }
+                UpdateUi.NeedsPermission -> {
+                    Text(
+                        "Android necesita que permitas que Cyberia instale apps. Se hace una sola vez.",
+                        style = MaterialTheme.typography.bodySmall,
+                    )
+                    Button(onClick = onAllow) { Text("Permitir") }
+                }
+                is UpdateUi.Failed -> {
+                    Text(state.message, color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall)
+                    Button(onClick = onInstall) { Text("Reintentar") }
                 }
             }
         }

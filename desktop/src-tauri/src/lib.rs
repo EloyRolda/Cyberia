@@ -10,6 +10,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIconBuilder, TrayIconEvent};
+use tauri::path::BaseDirectory;
 use tauri::{AppHandle, Emitter, Manager, RunEvent, State, WebviewUrl, WebviewWindowBuilder};
 use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_opener::OpenerExt;
@@ -228,6 +229,15 @@ pub fn run() {
                 core: core.clone(),
                 server_error: Mutex::new(None),
             });
+
+            // La app del celular que trae el instalador: el celular se actualiza desde acá.
+            match app.path().resolve("resources", BaseDirectory::Resource) {
+                Ok(dir) => match cyberia_core::android_app::AndroidApp::from_dir(&dir) {
+                    Ok(android_app) => core.set_android_app(android_app),
+                    Err(err) => tracing::warn!("no se pudo cargar la app del celular: {err:#}"),
+                },
+                Err(err) => tracing::warn!("no se encontró la carpeta de recursos: {err}"),
+            }
 
             // Reenvía los avisos del núcleo a la ventana, la bandeja y las notificaciones.
             let handle = app.handle().clone();

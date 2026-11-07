@@ -9,6 +9,7 @@ import app.cyberia.data.AppPrefs
 import app.cyberia.data.RoomTrackStore
 import app.cyberia.net.PcLocator
 import app.cyberia.sync.SyncManager
+import app.cyberia.update.UpdateManager
 import java.io.File
 
 /** Objetos compartidos por la app, los servicios y las tareas en segundo plano. */
@@ -28,9 +29,13 @@ class AppGraph(context: Context) {
         tracks = trackStore,
         blobs = blobs,
         freeSpace = { app.filesDir.usableSpace },
+        appVersionCode = BuildConfig.VERSION_CODE.toLong(),
+        appVersionName = BuildConfig.VERSION_NAME,
     )
 
     val locator = PcLocator(app, prefs)
 
-    val syncManager = SyncManager(app, prefs, engine, locator)
+    val updates = UpdateManager(app, prefs, locator)
+
+    val syncManager = SyncManager(app, prefs, engine, locator, updates)
 }

@@ -3,6 +3,7 @@ package app.cyberia.data
 import android.content.Context
 import android.content.SharedPreferences
 import androidx.core.content.edit
+import app.cyberia.core.AndroidAppInfo
 import app.cyberia.core.CyberiaJson
 import app.cyberia.core.PairedPc
 import app.cyberia.core.PendingDeletion
@@ -40,6 +41,10 @@ class AppPrefs(context: Context) {
     private val _pendingDeletion = MutableStateFlow(readJson<PendingDeletion>(KEY_PENDING_DELETION))
     val pendingDeletion: StateFlow<PendingDeletion?> = _pendingDeletion.asStateFlow()
 
+    private val _availableUpdate = MutableStateFlow(readJson<AndroidAppInfo>(KEY_UPDATE))
+    /** Versión nueva de la app que ofrece la PC, si la hay. */
+    val availableUpdate: StateFlow<AndroidAppInfo?> = _availableUpdate.asStateFlow()
+
     private val _manualHost = MutableStateFlow(sp.getString(KEY_MANUAL_HOST, null))
     val manualHost: StateFlow<String?> = _manualHost.asStateFlow()
 
@@ -63,6 +68,11 @@ class AppPrefs(context: Context) {
     fun setPendingDeletion(value: PendingDeletion?) {
         writeJson(KEY_PENDING_DELETION, value)
         _pendingDeletion.value = value
+    }
+
+    fun setAvailableUpdate(value: AndroidAppInfo?) {
+        writeJson(KEY_UPDATE, value)
+        _availableUpdate.value = value
     }
 
     /** IP de la PC escrita a mano, por si el router bloquea el descubrimiento (mDNS). */
@@ -116,6 +126,7 @@ class AppPrefs(context: Context) {
         private const val KEY_LAST_SYNC = "last_sync"
         private const val KEY_PENDING_DELETION = "pending_deletion"
         private const val KEY_MANUAL_HOST = "manual_host"
+        private const val KEY_UPDATE = "available_update"
         private const val KEY_DEVICE_ID = "device_id"
         private const val KEY_QUEUE = "last_queue"
         private const val KEY_TRACK = "last_track"

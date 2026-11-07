@@ -264,3 +264,102 @@ async fn el_celular_puede_desvincularse() {
     assert!(reopened.snapshot().device.is_none());
     assert_eq!(reopened.identity().fingerprint, fp);
 }
+
+#[tokio::test]
+async fn la_pc_ofrece_la_app_del_celular() {
+    let data = tempfile::tempdir().unwrap();
+    let res = tempfile::tempdir().unwrap();
+    let mut opts = CoreOptions::new(data.path());
+    opts.port = Some(0);
+    opts.advertise_mdns = false;
+    opts.bind_ip = IpAddr::V4(Ipv4Addr::LOCALHOST);
+    let core = Core::open(opts).unwrap();
+    let addr = core.start().await.unwrap();
+    let base = format!("https://{addr}");
+    let http = client();
+
+    let offer = core.start_pairing().unwrap();
+    let code = query_param(&offer.uri, "code");
+    let body: serde_json::Value = http
+        .post(format!("{base}/v1/pair"))
+        .json(&serde_json::json!({"code": code, "deviceId": "d1", "deviceName": "Moto"}))
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    let auth = format!("Bearer {}", body["token"].as_str().unwrap());
+
+    // Sin APK: la PC no ofrece nada.
+    let info: serde_json::Value = http
+        .get(format!("{base}/v1/info"))
+        .header("Authorization", &auth)
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert!(info["androidApp"].is_null());
+    let r = http
+        .get(format!("{base}/v1/app/android"))
+        .header("Authorization", &auth)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 404);
+
+    // Con el APK que trae el instalador.
+    let apk = vec![42u8; 50_000];
+    fs::write(res.path().join(cyberia_core::android_app::APK_FILE), &apk).unwrap();
+    fs::write(
+        res.path().join(cyberia_core::android_app::METADATA_FILE),
+        r#"{"elements":[{"versionCode":7,"versionName":"0.1.7"}]}"#,
+    )
+    .unwrap();
+    core.set_android_app(cyberia_core::android_app::AndroidApp::from_dir(res.path()).unwrap());
+    let info: serde_json::Value = http
+        .get(format!("{base}/v1/info"))
+        .header("Authorization", &auth)
+        .send()
+        .await
+        .unwrap()
+        .json()
+        .await
+        .unwrap();
+    assert_eq!(info["androidApp"]["versionCode"], 7);
+    assert_eq!(info["androidApp"]["versionName"], "0.1.7");
+    assert_eq!(info["androidApp"]["size"], 50_000);
+    assert_eq!(info["androidApp"]["sha256"].as_str().unwrap().len(), 64);
+    assert!(info["androidApp"].get("path").is_none());
+
+    // Sin token no se baja.
+    let r = http.get(format!("{base}/v1/app/android")).send().await.unwrap();
+    assert_eq!(r.status(), 401);
+    let r = http
+        .get(format!("{base}/v1/app/android"))
+        .header("Authorization", &auth)
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 200);
+    assert_eq!(
+        r.headers()["content-type"],
+        "application/vnd.android.package-archive"
+    );
+    assert_eq!(r.bytes().await.unwrap().to_vec(), apk);
+
+    // El celular informa su versión.
+    let r = http
+        .post(format!("{base}/v1/report"))
+        .header("Authorization", &auth)
+        .json(&serde_json::json!({"manifestVersion": 0, "appVersionCode": 5, "appVersionName": "0.1.5"}))
+        .send()
+        .await
+        .unwrap();
+    assert_eq!(r.status(), 204);
+    let report = core.snapshot().last_report.unwrap();
+    assert_eq!(report.report.app_version_code, Some(5));
+    core.shutdown();
+}

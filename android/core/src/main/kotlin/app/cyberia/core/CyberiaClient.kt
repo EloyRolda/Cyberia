@@ -121,6 +121,27 @@ class CyberiaClient(
         target: File,
         expectedSize: Long,
         onProgress: (Long) -> Unit = {},
+    ): Long = downloadTo(endpoint, token, "/v1/files/$id", target, expectedSize, onProgress)
+
+    /**
+     * Baja la app del celular que trae la PC (`GET /v1/app/android`) en [target], retomando si
+     * ya había una parte. Hay que verificar el SHA-256 antes de instalarla.
+     */
+    suspend fun downloadAndroidApp(
+        endpoint: Endpoint,
+        token: String,
+        target: File,
+        expectedSize: Long,
+        onProgress: (Long) -> Unit = {},
+    ): Long = downloadTo(endpoint, token, "/v1/app/android", target, expectedSize, onProgress)
+
+    private suspend fun downloadTo(
+        endpoint: Endpoint,
+        token: String,
+        path: String,
+        target: File,
+        expectedSize: Long,
+        onProgress: (Long) -> Unit,
     ): Long = call {
         target.parentFile?.mkdirs()
         var existing = if (target.exists()) target.length() else 0L
@@ -130,7 +151,7 @@ class CyberiaClient(
         }
         if (existing == expectedSize && expectedSize > 0) return@call existing
 
-        val builder = authed(endpoint, token, "/v1/files/$id")
+        val builder = authed(endpoint, token, path)
         if (existing > 0) builder.header("Range", "bytes=$existing-")
         http.newCall(builder.build()).execute().use { res ->
             val append = when (res.code) {

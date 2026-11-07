@@ -6,6 +6,7 @@
 //! ```text
 //! cyberia-server --folder ~/Música/Cyberia [--data-dir ./cyberia-data] [--port 47474]
 //!                [--name "Mi PC"] [--bind 0.0.0.0] [--no-mdns] [--pair] [--sync]
+//!                [--android-apk app.apk --android-version-code 12]
 //! ```
 //!
 //! Comandos por la entrada estándar: `sync`, `pair`, `unpair`, `status`, `quit`.
@@ -30,6 +31,8 @@ struct Args {
     pair: bool,
     sync: bool,
     qr: bool,
+    android_apk: Option<PathBuf>,
+    android_version_code: Option<u64>,
 }
 
 fn parse_args() -> anyhow::Result<Args> {
@@ -43,6 +46,8 @@ fn parse_args() -> anyhow::Result<Args> {
         pair: false,
         sync: false,
         qr: true,
+        android_apk: None,
+        android_version_code: None,
     };
     let mut it = std::env::args().skip(1);
     while let Some(arg) = it.next() {
@@ -57,10 +62,15 @@ fn parse_args() -> anyhow::Result<Args> {
             "--no-qr" => args.qr = false,
             "--pair" => args.pair = true,
             "--sync" => args.sync = true,
+            "--android-apk" => args.android_apk = Some(value("--android-apk")?.into()),
+            "--android-version-code" => {
+                args.android_version_code = Some(value("--android-version-code")?.parse().context("versión inválida")?)
+            }
             "-h" | "--help" => {
                 println!(
                     "uso: cyberia-server --folder <carpeta> [--data-dir <dir>] [--port <n>] [--name <nombre>]\n\
                      \x20                     [--bind <ip>] [--no-mdns] [--no-qr] [--pair] [--sync]\n\
+                     \x20                     [--android-apk <apk> --android-version-code <n>]\n\
                      comandos: sync, pair, unpair, status, quit"
                 );
                 std::process::exit(0);
@@ -98,6 +108,13 @@ async fn main() -> anyhow::Result<()> {
     let core = Core::open(options)?;
     if let Some(folder) = &args.folder {
         core.set_folder(folder)?;
+    }
+    if let Some(apk) = &args.android_apk {
+        let code = args
+            .android_version_code
+            .context("--android-apk necesita --android-version-code")?;
+        let app = cyberia_core::android_app::AndroidApp::load(apk, code, format!("0.1.{code}"))?;
+        core.set_android_app(Some(app));
     }
     let addr = core.start().await?;
     out(format!("LISTENING {addr}"));

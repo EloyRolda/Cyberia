@@ -9,6 +9,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 use std::time::Instant;
 use tokio::sync::broadcast;
 
+use crate::android_app::AndroidApp;
 use crate::cert::{self, Identity};
 use crate::config::{self, PairedDevice, Settings};
 use crate::library::{self, AudioFile, HashCache, Scan, ScanError};
@@ -109,6 +110,8 @@ pub struct Snapshot {
     pub phone_last_seen_ms: Option<u64>,
     pub last_report: Option<StoredReport>,
     pub pairing: Option<PairingOffer>,
+    /// App del celular que trae esta PC para actualizarlo.
+    pub android_app: Option<AndroidApp>,
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -174,6 +177,7 @@ struct Inner {
     last_report: Option<StoredReport>,
     last_seen_ms: Option<u64>,
     bound_port: Option<u16>,
+    android_app: Option<AndroidApp>,
 }
 
 pub struct Core {
@@ -223,6 +227,7 @@ impl Core {
                 last_report,
                 last_seen_ms: None,
                 bound_port: None,
+                android_app: None,
             }),
             scan_lock: tokio::sync::Mutex::new(()),
             sse_count: AtomicUsize::new(0),
@@ -343,6 +348,7 @@ impl Core {
             phone_last_seen_ms: inner.last_seen_ms,
             last_report: inner.last_report.clone(),
             pairing: inner.pairing.as_ref().map(|p| p.offer.clone()),
+            android_app: inner.android_app.clone(),
         }
     }
 
@@ -564,13 +570,27 @@ impl Core {
         ok
     }
 
-    pub(crate) fn info(&self) -> (String, String, u64) {
+    pub(crate) fn info(&self) -> (String, String, u64, Option<AndroidApp>) {
         let inner = self.lock();
         (
             inner.settings.pc_id.clone(),
             inner.settings.pc_name.clone(),
             inner.manifest.version,
+            inner.android_app.clone(),
         )
+    }
+
+    /// Define la app del celular que ofrece esta PC (la que viene en el instalador).
+    pub fn set_android_app(&self, app: Option<AndroidApp>) {
+        if let Some(app) = &app {
+            tracing::info!("app del celular disponible: {} ({})", app.version_name, app.version_code);
+        }
+        self.lock().android_app = app;
+        self.emit(CoreEvent::StateChanged);
+    }
+
+    pub(crate) fn android_app(&self) -> Option<AndroidApp> {
+        self.lock().android_app.clone()
     }
 
     pub(crate) fn manifest_json(&self) -> anyhow::Result<Vec<u8>> {

@@ -36,6 +36,18 @@ data class PcInfo(
     val pcId: String,
     val pcName: String,
     val manifestVersion: Long,
+    /** App del celular que trae la PC; `null` si no trae ninguna. */
+    val androidApp: AndroidAppInfo? = null,
+)
+
+/** Una versión de la app del celular que la PC ofrece por `GET /v1/app/android`. */
+@Serializable
+data class AndroidAppInfo(
+    val versionCode: Long,
+    val versionName: String,
+    val size: Long,
+    /** SHA-256 del APK en hexadecimal. */
+    val sha256: String,
 )
 
 @Serializable
@@ -72,6 +84,9 @@ data class SyncReport(
     val libraryCount: Int = 0,
     val libraryBytes: Long = 0,
     val complete: Boolean = false,
+    /** Versión de la app instalada en el celular. */
+    val appVersionCode: Long? = null,
+    val appVersionName: String? = null,
 )
 
 @Serializable

@@ -174,6 +174,50 @@ class EndToEndTest {
     }
 
     @Test
+    fun elCelularSeActualizaDesdeLaPc() = runBlocking {
+        // La PC trae una versión nueva de la app del celular.
+        server.close()
+        val apk = Random(3).nextBytes(300_000)
+        val apkFile = File(root, "cyberia.apk").apply { writeBytes(apk) }
+        server = ServerProcess(
+            File(System.getProperty("cyberia.server")),
+            music,
+            File(root, "pc-data-app"),
+            listOf("--android-apk", apkFile.absolutePath, "--android-version-code", "42"),
+        )
+        audio("a.mp3", 1000)
+        server.sync()
+        val info = PairingInfo.parse(server.pairUri())
+        val client = CyberiaClient(info.fingerprint)
+        val endpoint = info.endpoints.first()
+        val token = client.pair(endpoint, PairRequest(info.code, "dev-1", "Moto")).token
+
+        val offer = assertNotNull(client.info(endpoint, token).androidApp)
+        assertEquals(42, offer.versionCode)
+        assertEquals(apk.size.toLong(), offer.size)
+        assertEquals(Hashing.sha256Hex(apk), offer.sha256)
+
+        // Descarga cortada a la mitad: se retoma y queda igual al original.
+        val target = File(root, "update.apk")
+        target.writeBytes(apk.copyOfRange(0, 120_000))
+        client.downloadAndroidApp(endpoint, token, target, offer.size)
+        assertEquals(offer.sha256, Hashing.sha256File(target))
+
+        // El celular le informa a la PC qué versión tiene.
+        val engine = SyncEngine(
+            InMemoryTrackStore(),
+            BlobStore(File(root, "phone-app/audio")),
+            freeSpace = { 50L * 1024 * 1024 * 1024 },
+            appVersionCode = 41,
+            appVersionName = "0.1.41",
+        )
+        engine.sync(client, endpoint, token)
+        val report = server.status()["lastReport"]!!.jsonObject
+        assertEquals(41, report["appVersionCode"]!!.jsonPrimitive.int)
+        assertEquals(42, server.status()["androidApp"]!!.jsonObject["versionCode"]!!.jsonPrimitive.int)
+    }
+
+    @Test
     fun elCelularSeDesvincula() = runBlocking {
         audio("a.mp3", 1000)
         server.sync()
@@ -188,15 +232,17 @@ class EndToEndTest {
 }
 
 /** Corre `cyberia-server` y habla con él por la entrada y salida estándar. */
-class ServerProcess(bin: File, folder: File, dataDir: File) : AutoCloseable {
+class ServerProcess(bin: File, folder: File, dataDir: File, extraArgs: List<String> = emptyList()) : AutoCloseable {
     private val process: Process = ProcessBuilder(
-        bin.absolutePath,
-        "--folder", folder.absolutePath,
-        "--data-dir", dataDir.absolutePath,
-        "--port", "0",
-        "--bind", "127.0.0.1",
-        "--no-mdns",
-        "--no-qr",
+        listOf(
+            bin.absolutePath,
+            "--folder", folder.absolutePath,
+            "--data-dir", dataDir.absolutePath,
+            "--port", "0",
+            "--bind", "127.0.0.1",
+            "--no-mdns",
+            "--no-qr",
+        ) + extraArgs,
     ).redirectError(ProcessBuilder.Redirect.DISCARD).start()
 
     private val lines = LinkedBlockingQueue<String>()

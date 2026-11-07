@@ -1,0 +1,50 @@
+name: Crear clave de firma
+
+# Se corre UNA sola vez, a mano (Actions → «Crear clave de firma» → Run workflow).
+# Genera la clave con la que se firman todas las versiones del APK. Android solo acepta una
+# actualización firmada con la misma clave, así que no hay que cambiarla nunca.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  clave:
+    name: Generar la clave
+    runs-on: ubuntu-24.04
+    steps:
+      - name: No pisar una clave existente
+        env:
+          EXISTENTE: ${{ secrets.CYBERIA_KEYSTORE_BASE64 }}
+        run: |
+          if [ -n "$EXISTENTE" ]; then
+            echo "::error::Ya hay una clave en los secretos. Si se cambia, el celular no va a poder actualizarse encima y habría que reinstalarlo."
+            exit 1
+          fi
+
+      - name: Generar
+        run: |
+          mkdir clave
+          PASS="$(openssl rand -base64 48 | tr -dc 'A-Za-z0-9' | head -c 32)"
+          echo "::add-mask::$PASS"
+          keytool -genkeypair -keystore clave/cyberia.jks -storetype PKCS12 -alias cyberia \
+            -keyalg RSA -keysize 3072 -validity 10950 -storepass "$PASS" -keypass "$PASS" \
+            -dname "CN=Cyberia, O=Cyberia" > /dev/null 2>&1
+          base64 -w0 clave/cyberia.jks > clave/CYBERIA_KEYSTORE_BASE64.txt
+          printf '%s' "$PASS" > clave/CYBERIA_KEYSTORE_PASSWORD.txt
+          rm clave/cyberia.jks
+          cat > clave/LEEME.txt <<'TXT'
+          1. En GitHub, abrí el repositorio → Settings → Secrets and variables → Actions.
+          2. Creá dos secretos (New repository secret), copiando el contenido completo de cada archivo:
+             - CYBERIA_KEYSTORE_BASE64  ← CYBERIA_KEYSTORE_BASE64.txt
+             - CYBERIA_KEYSTORE_PASSWORD ← CYBERIA_KEYSTORE_PASSWORD.txt
+          3. Borrá estos archivos de tu computadora. El artefacto se borra solo en un día.
+          Desde la próxima corrida de la CI, todas las versiones salen firmadas con esta clave.
+          TXT
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: clave-de-firma
+          path: clave/
+          retention-days: 1

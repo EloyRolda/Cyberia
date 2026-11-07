@@ -29,6 +29,11 @@ pub struct SyncReport {
     /// El celular tiene todo lo del manifiesto.
     #[serde(default)]
     pub complete: bool,
+    /// Versión de la app instalada en el celular.
+    #[serde(default)]
+    pub app_version_code: Option<u64>,
+    #[serde(default)]
+    pub app_version_name: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]

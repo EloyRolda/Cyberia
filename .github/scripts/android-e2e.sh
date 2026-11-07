@@ -26,12 +26,15 @@ wav "$WORK/music/Para correr/01 Arranque.wav" 440
 wav "$WORK/music/Para correr/02 Subida.wav" 494
 wav "$WORK/music/Podcasts/Episodio 1.wav" 523
 
-# Servidor con comandos por un FIFO.
+# Servidor con comandos por un FIFO. Los argumentos extra se le pasan tal cual.
 mkfifo "$WORK/server.in"
-"$SERVER" --folder "$WORK/music" --data-dir "$WORK/pc" --port 47474 --no-mdns --no-qr \
-  < "$WORK/server.in" > "$OUT/server.log" 2>&1 &
-SERVER_PID=$!
-exec 3> "$WORK/server.in"
+start_server() {
+  "$SERVER" --folder "$WORK/music" --data-dir "$WORK/pc" --port 47474 --no-mdns --no-qr "$@" \
+    < "$WORK/server.in" >> "$OUT/server.log" 2>&1 &
+  SERVER_PID=$!
+  exec 3> "$WORK/server.in"
+}
+start_server
 trap 'echo quit >&3 || true; kill $SERVER_PID 2>/dev/null || true; adb logcat -d > "$OUT/logcat.txt" 2>/dev/null || true' EXIT
 
 shot() { # shot <nombre>: captura de pantalla en $OUT (y en el log si E2E_PRINT_SCREENSHOTS=1)
@@ -75,6 +78,17 @@ tap_desc() { # tap_desc <descripción>: toca el elemento con esa descripción de
   adb shell input tap $xy
 }
 
+wait_tap_text() { # wait_tap_text <texto> <segundos>: espera a que aparezca y lo toca
+  local deadline=$((SECONDS + $2)) xy
+  while (( SECONDS <= deadline )); do
+    dismiss_system_dialogs || true
+    xy="$(find_node text "$1")"
+    if [ -n "$xy" ]; then adb shell input tap $xy; return 0; fi
+    sleep 2
+  done
+  echo "No apareció «$1» en la pantalla"; return 1
+}
+
 wait_for() { # wait_for <segundos> <comando...>
   local deadline=$((SECONDS + $1)); shift
   until "$@"; do
@@ -114,7 +128,9 @@ adb shell settings put global hide_error_dialogs 1 || true
 adb logcat -c
 
 echo "== Vinculación por enlace y primera sincronización"
-adb shell "am start -W -a android.intent.action.VIEW -d '$URI' --ez cyberia.test.autoConfirm true -n app.cyberia/.ui.MainActivity"
+adb shell "am start -W -a android.intent.action.VIEW -d '$URI' -n app.cyberia/.ui.MainActivity"
+# Abrir el enlace pide confirmar antes de vincular.
+wait_tap_text "Vincular" 60
 # Puede haber más de un informe (al abrir la app, al cargar...): se mira el estado final.
 check_first() { [ "$(report_field "r.get('libraryCount') == 3 and bool(r.get('complete'))")" = "True" ]; }
 if ! wait_for 120 check_first; then
@@ -158,6 +174,45 @@ adb shell cmd statusbar expand-notifications || true
 sleep 2
 shot 04-notificaciones
 adb shell cmd statusbar collapse || true
+
+echo "== Actualización desde la PC, sin pasar archivos al celular"
+# La PC vuelve con un instalador nuevo que trae una versión más nueva de la app.
+adb shell input keyevent KEYCODE_MEDIA_PAUSE || true
+start_server --android-apk "$APK" --android-version-code 999999
+server_up_again() { [ "$(grep -c '^LISTENING' "$OUT/server.log")" -ge 2 ]; }
+wait_for 20 server_up_again
+before_update="$(adb shell dumpsys package app.cyberia | grep -m1 lastUpdateTime || true)"
+if ! wait_for 120 check_connected; then
+  echo "El celular no volvió a conectarse con la PC"; status; exit 1
+fi
+echo sync >&3
+check_offer() { [ "$(report_field "r.get('appVersionCode') is not None")" = "True" ]; }
+wait_for 60 check_offer || { echo "El celular no informó su versión"; status; exit 1; }
+adb shell appops set app.cyberia REQUEST_INSTALL_PACKAGES allow || true
+wait_tap_text "Actualizar" 60
+shot 05-actualizacion
+# Android pide confirmar la primera vez (después, Cyberia se actualiza sola desde Android 12).
+updated() { [ "$(adb shell dumpsys package app.cyberia | grep -m1 lastUpdateTime || true)" != "$before_update" ]; }
+deadline=$((SECONDS + 120))
+until updated; do
+  if (( SECONDS > deadline )); then echo "No se instaló la actualización"; shot 06-error; exit 1; fi
+  xy="$(find_node text Update)"
+  [ -n "$xy" ] && adb shell input tap $xy
+  sleep 2
+done
+echo "OK: se instaló la actualización"
+# Después de actualizar siguen la vinculación y los audios: la app vuelve a informar a la PC.
+reports_before="$(grep -c '"type":"report"' "$OUT/server.log" || true)"
+adb shell am start -W -n app.cyberia/.ui.MainActivity
+check_after() {
+  [ "$(grep -c '"type":"report"' "$OUT/server.log" || true)" -gt "$reports_before" ] &&
+  [ "$(report_field "r.get('libraryCount') == 4")" = "True" ]
+}
+if ! wait_for 90 check_after; then
+  echo "Después de actualizar, el celular perdió la vinculación o los audios"; status; exit 1
+fi
+echo "OK: después de actualizar siguen la vinculación y los 4 audios"
+shot 06-despues
 
 if adb logcat -d | grep -A 20 "FATAL EXCEPTION" | grep -q "app.cyberia"; then
   echo "La app se cerró con un error"; adb logcat -d | grep -A 30 "FATAL EXCEPTION"; exit 1

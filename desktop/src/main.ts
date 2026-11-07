@@ -51,6 +51,15 @@ interface StoredReport {
   libraryCount: number;
   libraryBytes: number;
   complete: boolean;
+  appVersionCode?: number | null;
+  appVersionName?: string | null;
+}
+
+interface AndroidApp {
+  versionCode: number;
+  versionName: string;
+  size: number;
+  sha256: string;
 }
 
 interface PairingOffer {
@@ -80,6 +89,7 @@ interface UiState {
   phoneLastSeenMs: number | null;
   lastReport: StoredReport | null;
   pairing: PairingOffer | null;
+  androidApp: AndroidApp | null;
   serverError: string | null;
   defaultFolder: string;
 }
@@ -253,10 +263,28 @@ function renderPhone(s: UiState): void {
         {},
         el("strong", {}, s.device.name),
         el("p", { class: "muted" }, status),
+        appVersionLine(s),
       ),
       el("button", { class: "ghost small", type: "button", onclick: () => void unpair() }, "Desvincular"),
     ),
   );
+}
+
+/** Versión de la app en el celular y si la PC le trae una más nueva. */
+function appVersionLine(s: UiState): Node | null {
+  const phone = s.lastReport?.appVersionCode ?? null;
+  const phoneName = s.lastReport?.appVersionName ?? null;
+  const pc = s.androidApp;
+  if (phone === null && !pc) return null;
+  if (pc && (phone === null || phone < pc.versionCode)) {
+    const now = phoneName ? `Tiene la ${phoneName}. ` : "";
+    return el(
+      "p",
+      { class: "muted" },
+      `${now}Esta PC trae la ${pc.versionName}: el celular te va a ofrecer actualizarse la próxima vez que se conecte.`,
+    );
+  }
+  return el("p", { class: "muted" }, `App del celular: ${phoneName ?? pc?.versionName} (al día).`);
 }
 
 function renderFolder(s: UiState): void {

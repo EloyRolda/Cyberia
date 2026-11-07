@@ -32,4 +32,17 @@ object Hashing {
     fun bytesId(bytes: ByteArray): String = "b3:" + Blake3.hash(bytes).toHex()
 
     fun sha256Hex(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256").digest(bytes).toHex()
+
+    fun sha256File(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        val buffer = ByteArray(256 * 1024)
+        file.inputStream().use { input ->
+            while (true) {
+                val n = input.read(buffer)
+                if (n < 0) break
+                digest.update(buffer, 0, n)
+            }
+        }
+        return digest.digest().toHex()
+    }
 }

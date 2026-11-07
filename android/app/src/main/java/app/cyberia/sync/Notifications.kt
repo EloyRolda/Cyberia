@@ -27,6 +27,7 @@ object Notifications {
     const val ID_NO_SPACE = 11
     const val ID_CONFIRM_DELETE = 12
     const val ID_UNPAIRED = 13
+    const val ID_UPDATE = 14
 
     fun createChannels(context: Context) {
         val nm = context.getSystemService(NotificationManager::class.java) ?: return
@@ -115,6 +116,16 @@ object Notifications {
             ID_CONFIRM_DELETE,
             "¿Borrar $count audios?",
             "Ya no están en la PC y son más de la mitad de la biblioteca. Abrí Cyberia para confirmar.",
+        )
+    }
+
+    /** La PC trae una versión nueva de la app. */
+    fun updateAvailable(context: Context, versionName: String, pcName: String) {
+        post(
+            context,
+            ID_UPDATE,
+            "Hay una versión nueva de Cyberia",
+            "La $versionName está en $pcName. Abrí Cyberia y tocá Actualizar: no hace falta pasar nada al celular.",
         )
     }
 

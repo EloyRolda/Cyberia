@@ -4,6 +4,7 @@
 //! maneja el emparejamiento por QR y sirve la API HTTPS local que consulta el celular.
 //! La app de bandeja (Tauri) y el servidor sin interfaz (`cyberia-server`) usan este crate.
 
+pub mod android_app;
 pub mod cert;
 pub mod config;
 mod core;

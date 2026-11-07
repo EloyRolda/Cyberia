@@ -3,6 +3,7 @@ package app.cyberia.ui
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import app.cyberia.BuildConfig
 import app.cyberia.core.CyberiaException
 import app.cyberia.core.PairingInfo
 import app.cyberia.data.AppPrefs
@@ -46,6 +47,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val manualHost = prefs.manualHost
     val syncStatus = syncManager.status
 
+    /** Versión nueva de la app que trae la PC, y cómo va su instalación. */
+    val availableUpdate = prefs.availableUpdate
+    val updateState = graph.updates.state
+    val versionName: String = BuildConfig.VERSION_NAME
+
     val playlists: StateFlow<List<PlaylistGroup>> = graph.database.tracks().observeAll()
         .map { tracks ->
             tracks.groupBy { it.playlist }
@@ -77,13 +83,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * Enlace `cyberia://pair` (por ejemplo, el QR leído con la cámara del sistema). Como lo puede
      * abrir cualquier app o página, se pide confirmación antes de vincular.
      */
-    fun onPairingLink(text: String?, autoConfirm: Boolean = false) {
+    fun onPairingLink(text: String?) {
         val info = parsePairing(text) ?: return
-        if (autoConfirm) {
-            pair(info)
-        } else {
-            _pairing.value = PairingUi.Confirm(info, replacing = pairedPc.value?.pcName)
-        }
+        _pairing.value = PairingUi.Confirm(info, replacing = pairedPc.value?.pcName)
     }
 
     fun confirmPairing() {
@@ -141,6 +143,12 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun dismissDeletion() = syncManager.dismissPendingDeletion()
 
     fun setManualHost(text: String?) = prefs.setManualHost(text)
+
+    fun installUpdate() {
+        viewModelScope.launch { graph.updates.downloadAndInstall() }
+    }
+
+    fun clearUpdateError() = graph.updates.clearError()
 
     // ---- Reproductor ----
 
