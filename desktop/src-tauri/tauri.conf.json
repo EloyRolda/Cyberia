@@ -39,6 +39,8 @@
     },
     "resources": [
       "resources/*"
-    ]
+    ],
+    "license": "GPL-3.0-or-later",
+    "copyright": "Copyright © 2026 EloyRolda. Software libre bajo la licencia GPL 3.0 o posterior."
   }
 }

@@ -178,3 +178,17 @@ celular en el bolsillo y la instalación por alguien que no conoce la app.
 **Pendiente para v1:** sincronización automática al detectar cambios (RF-28), posición por audio
 (RF-38), título y duración desde las etiquetas (RF-39), arrastrar audios a la ventana (RF-15),
 arrancar con el sistema (RF-16), apagar el modo espera (RF-43), firma de release y Google Play.
+
+## Licencia
+
+Copyright © 2026 EloyRolda.
+
+Cyberia es software libre: podés redistribuirlo y modificarlo bajo los términos de la
+**Licencia Pública General de GNU, versión 3** o, a tu elección, cualquier versión posterior,
+tal como la publica la Free Software Foundation. Se distribuye con la esperanza de que sea útil,
+pero **sin ninguna garantía**, ni siquiera la garantía implícita de comerciabilidad o de aptitud
+para un propósito particular. El texto completo está en [`LICENSE`](LICENSE).
+
+Las librerías de terceros que usa (Tauri, axum, rustls, Media3, OkHttp, ZXing, entre otras)
+tienen sus propias licencias, todas compatibles con la GPL 3.0: MIT, Apache 2.0, ISC, BSD, Zlib
+y MPL 2.0.

@@ -277,7 +277,7 @@ fun LibraryScreen(
                                 },
                             )
                             DropdownMenuItem(
-                                text = { Text("Cyberia ${vm.versionName}") },
+                                text = { Text("Cyberia ${vm.versionName} · software libre (GPL 3.0), sin garantía") },
                                 onClick = {},
                                 enabled = false,
                             )
